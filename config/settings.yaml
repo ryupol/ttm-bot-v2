@@ -1,0 +1,15 @@
+base_url: https://www.thaiticketmajor.com
+headless: false
+manual_solve_timeout: 300
+debug: false
+browser:
+  name: chromium
+  # Optional: set channel: chrome to use installed Google Chrome.
+window:
+  screen_width: 1440
+  screen_height: 900
+  gap: 8
+telegram:
+  enabled: true
+  token_env: TELEGRAM_TOKEN
+  chat_id_env: TELEGRAM_CHAT_ID

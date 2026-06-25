@@ -1,0 +1,17 @@
+event_url: https://www.thaiticketmajor.com/performance/example-concert.html
+event_date: "2026-12-15"
+zone_priority: ["B2", "B1", "A2", "A1"]
+ticket_count: 4
+seat_retry_limit: 7
+seat_strategy:
+  prefer_rows: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+  avoid_rows: [1, 2]
+  prefer_center: true
+selectors:
+  buy_now_btn: "a.btn-buynow"
+  zone_link: "a[href*='zone={zone}']"
+queue_indicators:
+  queue_url_pattern: "/queue"
+  verify_url_pattern: "/verify.php"
+  captcha_selector: "img.captcha, iframe[src*='recaptcha']"
+  puzzle_selector: ".puzzle-slider, .geetest"

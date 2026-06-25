@@ -1,0 +1,8 @@
+node_modules/
+.npm-cache/
+.idea/
+dist/
+coverage/
+bot_data/
+secrets/.env
+.DS_Store
