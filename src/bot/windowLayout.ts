@@ -1,5 +1,5 @@
 import type { BrowserContext } from "playwright";
-import type { Settings } from "../config/schema.js";
+import type { Settings } from "../config/schema.ts";
 
 export type Tile = {
   left: number;

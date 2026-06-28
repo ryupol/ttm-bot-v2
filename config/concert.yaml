@@ -1,12 +1,26 @@
-event_url: https://www.thaiticketmajor.com/performance/example-concert.html
-event_date: "2026-12-15"
-zone_priority: ["B2", "B1", "A2", "A1"]
-ticket_count: 4
+event_url: https://www.thaiticketmajor.com/concert/pond-phuwin-space-soul-dyssey-concert.html
+event_date: "2026-08-21"
+target_round:
+  date: "2026-08-21"
+  time: "18:00"
+
+  # type options:
+  # - offline: physical venue concert; excludes Live Streaming and RERUN
+  # - live_streaming: TTM LIVE live stream product
+  # - rerun: replay product
+  # - any: first matching date/time; risky, not recommended
+  type: "offline"
+
+queue_start: "2026-06-28T09:00:00+07:00"
+sale_start: "2026-06-28T10:00:00+07:00"
+
+zone_priority: ["SC", "SD", "SE", "SF", "SG", "SH", "SI", "SJ", "SK", "SL", "SM"]
+ticket_count: 2
 seat_retry_limit: 7
 seat_strategy:
-  prefer_rows: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
-  avoid_rows: [1, 2]
-  prefer_center: true
+  prefer_rows: []
+  avoid_rows: []
+  prefer_center: false
 selectors:
   buy_now_btn: "a.btn-buynow"
   zone_link: "a[href*='zone={zone}']"
@@ -15,3 +29,11 @@ queue_indicators:
   verify_url_pattern: "/verify.php"
   captcha_selector: "img.captcha, iframe[src*='recaptcha']"
   puzzle_selector: ".puzzle-slider, .geetest"
+observability:
+  mode: forensic
+  artifact_root: bot_data/runs
+  capture_html: true
+  capture_screenshot: true
+  capture_network_failures: true
+  capture_console_errors: true
+  keep_runs: 10

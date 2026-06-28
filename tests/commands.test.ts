@@ -1,18 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { nextStartTime, parseCommand, resolveTargets } from "../src/ipc/commands.js";
+import { parseCommand, resolveTargets } from "../src/ipc/commands.ts";
 
 describe("commands", () => {
   it("parses target commands", () => {
-    expect(parseCommand("prepare all")).toEqual({ type: "prepare", target: "all" });
+    expect(parseCommand("login all")).toEqual({ type: "login", target: "all" });
+    expect(parseCommand("go all")).toEqual({ type: "go", target: "all" });
     expect(parseCommand("stop 4")).toEqual({ type: "stop", target: 4 });
   });
 
-  it("parses set-time command", () => {
-    expect(parseCommand("set-time 10:00:00")).toEqual({ type: "set-time", time: "10:00:00" });
+  it("parses check command", () => {
+    expect(parseCommand("check all")).toEqual({ type: "check", target: "all" });
+    expect(parseCommand("check 2")).toEqual({ type: "check", target: 2 });
   });
 
   it("rejects unknown commands", () => {
     expect(() => parseCommand("launch all")).toThrow("Unknown command");
+    expect(() => parseCommand("arm all")).toThrow("Unknown command");
+    expect(() => parseCommand("set-time 10:00:00")).toThrow("Unknown command");
   });
 
   it("resolves all or specific targets", () => {
@@ -20,8 +24,4 @@ describe("commands", () => {
     expect(resolveTargets(2, [1, 2, 3])).toEqual([2]);
   });
 
-  it("schedules next day when time already passed", () => {
-    const now = new Date("2026-06-25T10:00:00+07:00");
-    expect(nextStartTime(now, "09:59:59").toISOString()).toBe("2026-06-26T02:59:59.000Z");
-  });
 });

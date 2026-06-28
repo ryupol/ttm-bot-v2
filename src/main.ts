@@ -2,30 +2,40 @@ import React from "react";
 import { parseArgs } from "node:util";
 import { Worker } from "node:worker_threads";
 import { render } from "ink";
-import { loadAppConfig } from "./config/load.js";
-import { createBotWorkerHandle, type BotWorkerHandle } from "./ipc/channel.js";
-import { nextStartTime, parseCommand, resolveTargets } from "./ipc/commands.js";
-import type { BotCommand, BotEvent, BotSnapshot, LogEntry, MainCommand } from "./ipc/types.js";
-import { App } from "./tui/App.js";
+import { selectBotAccounts } from "./config/accounts.ts";
+import { loadAppConfig } from "./config/load.ts";
+import { createBotWorkerHandle, type BotWorkerHandle } from "./ipc/channel.ts";
+import { parseCommand, resolveTargets } from "./ipc/commands.ts";
+import { createStartupAutoLogin } from "./ipc/startupAutoLogin.ts";
+import type { BotCommand, BotEvent, BotSnapshot, LogEntry, MainCommand } from "./ipc/types.ts";
+import { App } from "./tui/App.tsx";
 
 const options = parseCli();
-const { config, accounts } = loadAppConfig({
+const { config, accounts, accountRouting } = loadAppConfig({
   concertPath: options.concert,
   settingsPath: options.settings,
   accountsPath: options.accounts,
 });
 
-const botCount = options.bots ?? Math.min(accounts.length, 5);
-const selectedAccounts = accounts.slice(0, botCount);
+const selectedAccounts = selectBotAccounts(accounts, {
+  botCount: options.bots,
+  reuseFirstAccount: accountRouting.reuseFirstAccount,
+});
 if (selectedAccounts.length === 0) throw new Error("No accounts configured");
+const runId = formatRunId(new Date());
 
 const snapshots = new Map<number, BotSnapshot>();
 const logs: LogEntry[] = [];
 const workers = new Map<number, BotWorkerHandle>();
 let selectedLogBot: number | undefined;
-let scheduledStart: string | undefined;
-let scheduledTimer: NodeJS.Timeout | undefined;
 let ink: ReturnType<typeof render> | undefined;
+const startupAutoLogin = createStartupAutoLogin({
+  enabled: config.settings.auto_login_on_startup,
+  send: (botId, command) => {
+    workers.get(botId)?.send(command);
+    addLog(botId, "command: login (startup)");
+  },
+});
 
 for (const account of selectedAccounts) {
   snapshots.set(account.id, { id: account.id, state: "IDLE" });
@@ -40,6 +50,7 @@ for (const account of selectedAccounts) {
       totalBots: selectedAccounts.length,
       config,
       account,
+      runId,
     },
     execArgv: sourceIsTypescript() ? ["--import", "tsx"] : undefined,
   });
@@ -60,11 +71,14 @@ function onBotEvent(event: BotEvent): void {
       lastEventAt: new Date().toISOString(),
     });
     addLog(event.botId, `state -> ${event.state}${event.detail ? ` (${event.detail})` : ""}`);
+    startupAutoLogin.onBotEvent(event);
   }
 
   if (event.type === "log") addLog(event.botId, event.message);
   if (event.type === "alert") addLog(event.botId, event.message);
-  if (event.type === "error") addLog(event.botId, `ERROR: ${event.message}`);
+  if (event.type === "error") {
+    addLog(event.botId, `ERROR: ${event.message}`);
+  }
 
   renderApp();
 }
@@ -80,20 +94,6 @@ function handleCommand(input: string): void {
 }
 
 function dispatch(command: MainCommand): void {
-  if (command.type === "set-time") {
-    const start = nextStartTime(new Date(), command.time);
-    scheduledStart = start.toLocaleString();
-    if (scheduledTimer) clearTimeout(scheduledTimer);
-    scheduledTimer = setTimeout(() => {
-      addLog(undefined, "scheduled start fired");
-      broadcast({ type: "go", scheduledFor: scheduledStart });
-      scheduledStart = undefined;
-      renderApp();
-    }, Math.max(0, start.getTime() - Date.now()));
-    addLog(undefined, `scheduled go all at ${scheduledStart}`);
-    return;
-  }
-
   if (command.type === "log") {
     selectedLogBot = command.target === "all" ? undefined : command.target;
     addLog(undefined, command.target === "all" ? "log filter: all" : `log filter: bot ${command.target}`);
@@ -101,22 +101,24 @@ function dispatch(command: MainCommand): void {
   }
 
   const botCommand = toBotCommand(command);
-  for (const botId of resolveTargets(command.target, [...workers.keys()])) {
+  const botIds = resolveTargets(command.target, [...workers.keys()]);
+  for (const botId of botIds) {
     workers.get(botId)?.send(botCommand);
     addLog(botId, `command: ${command.type}`);
   }
 }
 
-function toBotCommand(command: Exclude<MainCommand, { type: "set-time" | "log" }>): BotCommand {
-  if (command.type === "prepare") return { type: "prepare" };
+function toBotCommand(command: Exclude<MainCommand, { type: "log" }>): BotCommand {
+  if (command.type === "login") return { type: "login" };
+  if (command.type === "check") return { type: "check" };
   if (command.type === "go") return { type: "go" };
   if (command.type === "stop") return { type: "stop" };
   if (command.type === "reset") return { type: "reset" };
-  return { type: "assign" };
+  return assertNever(command);
 }
 
-function broadcast(command: BotCommand): void {
-  for (const worker of workers.values()) worker.send(command);
+function assertNever(value: never): never {
+  throw new Error(`Unhandled command: ${JSON.stringify(value)}`);
 }
 
 function addLog(botId: number | undefined, message: string): void {
@@ -133,7 +135,6 @@ function renderApp(): ReturnType<typeof render> {
     bots: [...snapshots.values()].sort((a, b) => a.id - b.id),
     logs,
     selectedLogBot,
-    scheduledStart,
     onCommand: handleCommand,
   });
 
@@ -145,7 +146,6 @@ function renderApp(): ReturnType<typeof render> {
 }
 
 async function shutdown(): Promise<void> {
-  if (scheduledTimer) clearTimeout(scheduledTimer);
   addLog(undefined, "shutting down workers");
   renderApp();
   await Promise.all([...workers.values()].map((worker) => worker.stop().catch(() => undefined)));
@@ -180,4 +180,19 @@ function resolveWorkerUrl(): URL {
 
 function sourceIsTypescript(): boolean {
   return import.meta.url.endsWith(".ts");
+}
+
+function formatRunId(date: Date): string {
+  const tzOffset = -date.getTimezoneOffset();
+  const sign = tzOffset >= 0 ? "+" : "-";
+  const hh = String(Math.floor(Math.abs(tzOffset) / 60)).padStart(2, "0");
+  const mm = String(Math.abs(tzOffset) % 60).padStart(2, "0");
+  const local =
+    `${date.getFullYear()}${pad2(date.getMonth() + 1)}${pad2(date.getDate())}` +
+    `T${pad2(date.getHours())}${pad2(date.getMinutes())}${pad2(date.getSeconds())}`;
+  return `${local}${sign}${hh}${mm}`;
+}
+
+function pad2(value: number): string {
+  return String(value).padStart(2, "0");
 }

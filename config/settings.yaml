@@ -4,7 +4,7 @@ manual_solve_timeout: 300
 debug: false
 browser:
   name: chromium
-  # Optional: set channel: chrome to use installed Google Chrome.
+  channel: chrome
 window:
   screen_width: 1440
   screen_height: 900

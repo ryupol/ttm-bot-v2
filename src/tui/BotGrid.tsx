@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
-import type { BotSnapshot, BotState } from "../ipc/types.js";
+import type { BotSnapshot, BotState } from "../ipc/types.ts";
 
 type Props = {
   bots: BotSnapshot[];
@@ -27,8 +27,9 @@ export function BotGrid({ bots }: Props): React.ReactElement {
 function stateColor(state: BotState): string {
   if (state === "DONE") return "green";
   if (state === "ERROR" || state === "STOPPED") return "red";
+  if (state === "MANUAL_INTERVENTION") return "red";
   if (state === "BOOKING") return "magenta";
-  if (state === "IN_QUEUE" || state === "AWAITING_USER") return "yellow";
-  if (state === "READY") return "cyan";
+  if (state === "IN_QUEUE" || state === "AWAITING_USER" || state === "WATCHING_QUEUE_OPEN") return "yellow";
+  if (state === "READY" || state === "ARMED") return "cyan";
   return "gray";
 }

@@ -1,9 +1,12 @@
-import type { AppConfig, ResolvedAccount } from "../config/schema.js";
+import type { AppConfig, ResolvedAccount } from "../config/schema.ts";
 
 export type BotState =
   | "IDLE"
+  | "ARMED"
   | "READY"
+  | "WATCHING_QUEUE_OPEN"
   | "IN_QUEUE"
+  | "MANUAL_INTERVENTION"
   | "AWAITING_USER"
   | "BOOKING"
   | "DONE"
@@ -13,23 +16,24 @@ export type BotState =
 export type CommandTarget = "all" | number;
 
 export type BotCommand =
-  | { type: "prepare" }
+  | { type: "login" }
+  | { type: "check" }
   | { type: "go"; scheduledFor?: string }
   | { type: "stop" }
-  | { type: "reset" }
-  | { type: "assign" };
+  | { type: "shutdown" }
+  | { type: "reset" };
 
 export type MainCommand =
-  | { type: "prepare"; target: CommandTarget }
+  | { type: "login"; target: CommandTarget }
+  | { type: "check"; target: CommandTarget }
   | { type: "go"; target: CommandTarget }
   | { type: "stop"; target: CommandTarget }
   | { type: "reset"; target: CommandTarget }
-  | { type: "assign"; target: CommandTarget }
-  | { type: "log"; target: CommandTarget }
-  | { type: "set-time"; time: string };
+  | { type: "log"; target: CommandTarget };
 
 export type BotAlertKind =
   | "captcha_detected"
+  | "manual_intervention"
   | "queue_exit"
   | "no_seats"
   | "seats_selected";
@@ -45,6 +49,7 @@ export type WorkerInit = {
   totalBots: number;
   config: AppConfig;
   account: ResolvedAccount;
+  runId?: string;
 };
 
 export type PickedSeat = {

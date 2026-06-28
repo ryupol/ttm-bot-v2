@@ -1,5 +1,5 @@
 import type { Worker } from "node:worker_threads";
-import type { BotCommand, BotEvent } from "./types.js";
+import type { BotCommand, BotEvent } from "./types.ts";
 
 export type BotWorkerHandle = {
   botId: number;
@@ -28,8 +28,16 @@ export function createBotWorkerHandle(
       worker.postMessage(command);
     },
     async stop() {
-      worker.postMessage({ type: "stop" } satisfies BotCommand);
-      await worker.terminate();
+      worker.postMessage({ type: "shutdown" } satisfies BotCommand);
+      await new Promise<void>((resolve) => {
+        const timeout = setTimeout(() => {
+          void worker.terminate().finally(resolve);
+        }, 5000);
+        worker.once("exit", () => {
+          clearTimeout(timeout);
+          resolve();
+        });
+      });
     },
   };
 }

@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
-import type { LogEntry } from "../ipc/types.js";
+import type { LogEntry } from "../ipc/types.ts";
 
 type Props = {
   logs: LogEntry[];

@@ -1,21 +1,6 @@
+reuse_first_account: true
 accounts:
   - id: 1
-    email_env: ACCOUNT_1_EMAIL
-    pass_env: ACCOUNT_1_PASS
-    citizen_id_env: ACCOUNT_1_CITIZEN_ID
-  - id: 2
-    email_env: ACCOUNT_2_EMAIL
-    pass_env: ACCOUNT_2_PASS
-    citizen_id_env: ACCOUNT_2_CITIZEN_ID
-  - id: 3
-    email_env: ACCOUNT_3_EMAIL
-    pass_env: ACCOUNT_3_PASS
-    citizen_id_env: ACCOUNT_3_CITIZEN_ID
-  - id: 4
-    email_env: ACCOUNT_4_EMAIL
-    pass_env: ACCOUNT_4_PASS
-    citizen_id_env: ACCOUNT_4_CITIZEN_ID
-  - id: 5
-    email_env: ACCOUNT_5_EMAIL
-    pass_env: ACCOUNT_5_PASS
-    citizen_id_env: ACCOUNT_5_CITIZEN_ID
+    email_env: ACCOUNT_EMAIL
+    pass_env: ACCOUNT_PASS
+    citizen_id_env: ACCOUNT_CITIZEN_ID

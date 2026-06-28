@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeTile } from "../src/bot/windowLayout.js";
+import { computeTile } from "../src/bot/windowLayout.ts";
 
 describe("computeTile", () => {
   it("tiles five bots into stable equal grid cells", () => {

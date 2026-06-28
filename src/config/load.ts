@@ -8,7 +8,8 @@ import {
   type ResolvedAccount,
   ConcertSchema,
   SettingsSchema,
-} from "./schema.js";
+} from "./schema.ts";
+import type { AccountRouting } from "./accounts.ts";
 
 export type LoadOptions = {
   rootDir?: string;
@@ -17,7 +18,11 @@ export type LoadOptions = {
   concertPath?: string;
 };
 
-export function loadAppConfig(options: LoadOptions = {}): { config: AppConfig; accounts: ResolvedAccount[] } {
+export function loadAppConfig(options: LoadOptions = {}): {
+  config: AppConfig;
+  accounts: ResolvedAccount[];
+  accountRouting: AccountRouting;
+} {
   const rootDir = options.rootDir ?? process.cwd();
   dotenv.config({ path: path.join(rootDir, "secrets", ".env"), override: false });
 
@@ -32,6 +37,7 @@ export function loadAppConfig(options: LoadOptions = {}): { config: AppConfig; a
   return {
     config: { rootDir, settings, concert },
     accounts: accountFile.accounts.map(resolveAccount),
+    accountRouting: { reuseFirstAccount: accountFile.reuse_first_account },
   };
 }
 

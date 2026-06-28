@@ -1,3 +1,6 @@
+import type { Page } from "playwright";
+import { matchSignatures } from "./signatures.ts";
+
 export type PageKind =
   | "login"
   | "verify_condition"
@@ -27,11 +30,10 @@ export const MAX_VISITS: Record<PageKind, number> = {
   unknown: 1,
 };
 
-export function classifyPage(url: string): PageKind {
+export function classifyPage(url: string, html?: string): PageKind {
   if (url.includes("signin.php") || url.includes("/user/login")) return "login";
   if (url.includes("verify_condition.php")) return "verify_condition";
   if (url.includes("verify.php")) return "verify";
-  if (url.includes("/queue")) return "queue";
   if (url.includes("zones.php")) return "zones";
   if (url.includes("fixed.php")) return "fixed";
   if (url.includes("paymentall.php")) return "payment";
@@ -39,5 +41,17 @@ export function classifyPage(url: string): PageKind {
   if (url.includes("error.php")) return "error";
   if (url.includes("/performance/") || url.includes("/concert/")) return "event";
   if (url.includes("index.html") || url.replace(/\/$/, "").endsWith(".com")) return "home";
+  for (const match of matchSignatures({ url, html })) {
+    if (match.signature.pageKind) return match.signature.pageKind;
+  }
+  if (url.includes("/queue")) return "queue";
   return "unknown";
+}
+
+export async function classifyCurrentPage(page: Page): Promise<PageKind> {
+  const url = page.url();
+  const urlOnly = classifyPage(url);
+  if (urlOnly !== "unknown") return urlOnly;
+  const html = await page.content().catch(() => undefined);
+  return classifyPage(url, html);
 }
