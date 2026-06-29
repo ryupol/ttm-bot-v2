@@ -185,7 +185,27 @@ describe("resolveTargetRoundOnPage", () => {
     });
 
     expect(result?.dataButton).toBe("9256");
+    expect(result?.requiresLogin).toBe(false);
     expect(result?.queueOrBookingCapable).toBe(true);
+  });
+
+  it("does not treat signin-gated booking links as booking capable", async () => {
+    page = createFakePage(
+      fixture.replace(
+        'data-button="9253" href="javascript:;" class="btn" disabled',
+        'data-button="9256" href="javascript:;" class="btn" onclick="$app.popup.signin(\'https://booking.thaiticketmajor.com/booking/3m/zones.php?query=557\')"',
+      ),
+    );
+
+    const result = await resolveTargetRoundOnPage(page, {
+      date: "2026-08-21",
+      time: "18:00",
+      type: "offline",
+    });
+
+    expect(result?.dataButton).toBe("9256");
+    expect(result?.requiresLogin).toBe(true);
+    expect(result?.queueOrBookingCapable).toBe(false);
   });
 
   it("detects sold out target round from sibling status text", async () => {

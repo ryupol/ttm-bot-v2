@@ -1,12 +1,8 @@
 import type { Page } from "playwright";
 import type { Concert } from "../../config/schema.ts";
 import type { BotEvent } from "../../ipc/types.ts";
-import {
-  detectManualInterventionOnPage,
-  type ManualInterventionState,
-  type ManualInterventionReason,
-  transitionManualIntervention,
-} from "../manualIntervention.ts";
+import type { ManualInterventionReason, ManualInterventionState } from "../models/ManualIntervention.ts";
+import { detectManualInterventionOnPage, transitionManualIntervention } from "../manualIntervention.ts";
 import type { Notifier } from "../notifier.ts";
 import { classifyPage } from "./classifier.ts";
 

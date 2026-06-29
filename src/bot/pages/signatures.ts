@@ -1,4 +1,4 @@
-import type { ManualInterventionReason } from "../manualIntervention.ts";
+import type { ManualInterventionReason } from "../models/ManualIntervention.ts";
 import type { PageKind } from "./classifier.ts";
 
 export type PageSignature = {

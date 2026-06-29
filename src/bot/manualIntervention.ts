@@ -1,24 +1,10 @@
 import type { Page } from "playwright";
+import type {
+  ManualInterventionReason,
+  ManualInterventionState,
+  ManualInterventionTransition,
+} from "./models/ManualIntervention.ts";
 import { matchSignatures } from "./pages/signatures.ts";
-
-export type ManualInterventionReason =
-  | "login"
-  | "captcha"
-  | "verify"
-  | "terms"
-  | "unknown_page"
-  | "queue_presence_confirm"
-  | "forbidden"
-  | "too_many_requests";
-export type ManualInterventionState = {
-  present: false;
-} | {
-  present: true;
-  reason: ManualInterventionReason;
-  detail?: string;
-  userMessage: string;
-};
-export type ManualInterventionTransition = "appeared" | "cleared" | "unchanged";
 
 const YZ_IMAGE_CLASS_PATTERN = /<img\b[^>]*\bclass\s*=\s*["'][^"']*\byz\b[^"']*["'][^>]*>/i;
 const TERMS_CONTROL_PATTERN = /<[^>]*(?:btn_confirmpolicy|rdagree)[^>]*>/gi;

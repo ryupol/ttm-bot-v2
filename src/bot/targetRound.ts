@@ -1,18 +1,6 @@
 import type { Page } from "playwright";
 import type { TargetRound } from "../config/schema.ts";
-
-export type TargetRoundState = {
-  dataButton: string;
-  dateText: string;
-  timeText: string;
-  type: "offline" | "live_streaming" | "rerun" | "any";
-  disabled: boolean;
-  soldOut: boolean;
-  href: string;
-  onclick: string;
-  label: string;
-  queueOrBookingCapable: boolean;
-};
+import type { TargetRoundState } from "./models/TargetRound.ts";
 
 export async function resolveTargetRoundOnPage(page: Page, target: TargetRound): Promise<TargetRoundState | undefined> {
   return page.evaluate((targetRound) => {
@@ -52,6 +40,10 @@ export async function resolveTargetRoundOnPage(page: Page, target: TargetRound):
         roundStatusText.includes("soldout") ||
         roundStatusText.includes("จำหน่ายหมด");
       const navEvidence = `${href} ${onclick} ${label}`.toLowerCase();
+      const requiresLogin =
+        navEvidence.includes("popup.signin") ||
+        navEvidence.includes("signin.php") ||
+        navEvidence.includes("/user/login");
       return {
         dataButton: button.getAttribute("data-button") ?? "",
         dateText,
@@ -62,9 +54,11 @@ export async function resolveTargetRoundOnPage(page: Page, target: TargetRound):
         href,
         onclick,
         label,
+        requiresLogin,
         queueOrBookingCapable:
           !disabled &&
           !soldOut &&
+          !requiresLogin &&
           (navEvidence.includes("queue") || navEvidence.includes("zones.php") || navEvidence.includes("booking")),
       };
     }

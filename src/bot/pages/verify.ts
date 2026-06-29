@@ -1,16 +1,6 @@
 import type { Page } from "playwright";
 import type { ResolvedAccount } from "../../config/schema.ts";
-
-export type VerifyResult =
-  | { status: "passed" }
-  | { status: "not_verify_page" }
-  | { status: "missing_citizen_id" }
-  | { status: "failed"; error?: string };
-
-export type VerifyConditionResult =
-  | { status: "submitted" }
-  | { status: "not_verify_condition_page" }
-  | { status: "confirm_not_found" };
+import type { VerifyConditionResult, VerifyResult } from "../models/Verification.ts";
 
 type VerifyPage = Pick<Page, "url" | "locator" | "waitForURL" | "waitForLoadState">;
 type VerifyConditionPage = Pick<Page, "url" | "locator" | "evaluate" | "waitForURL" | "waitForLoadState">;
