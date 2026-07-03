@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pickSeats, type AvailableSeat } from "../src/bot/seatPicker.ts";
+import { pickSeats, type AvailableSeat } from "../src/bot/booking/seatPicker.ts";
 import type { SeatStrategy } from "../src/config/schema.ts";
 
 const centerStrategy: SeatStrategy = {

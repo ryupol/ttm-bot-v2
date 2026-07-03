@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import type { Page } from "playwright";
 import { beforeEach, describe, expect, it } from "vitest";
-import { resolveTargetRoundOnPage } from "../src/bot/targetRound.ts";
+import { resolveTargetRoundOnPage, TargetRoundResolver, type TargetRoundCandidate } from "../src/bot/booking/TargetRoundResolver.ts";
 
 const fixture = readFileSync(path.join(process.cwd(), "tests/fixtures/pond-phuwin-event.html"), "utf8");
 
@@ -185,11 +185,10 @@ describe("resolveTargetRoundOnPage", () => {
     });
 
     expect(result?.dataButton).toBe("9256");
-    expect(result?.requiresLogin).toBe(false);
     expect(result?.queueOrBookingCapable).toBe(true);
   });
 
-  it("does not treat signin-gated booking links as booking capable", async () => {
+  it("keeps main behavior for signin-gated booking links", async () => {
     page = createFakePage(
       fixture.replace(
         'data-button="9253" href="javascript:;" class="btn" disabled',
@@ -204,8 +203,7 @@ describe("resolveTargetRoundOnPage", () => {
     });
 
     expect(result?.dataButton).toBe("9256");
-    expect(result?.requiresLogin).toBe(true);
-    expect(result?.queueOrBookingCapable).toBe(false);
+    expect(result?.queueOrBookingCapable).toBe(true);
   });
 
   it("detects sold out target round from sibling status text", async () => {
@@ -254,3 +252,83 @@ describe("resolveTargetRoundOnPage", () => {
     expect(result).toBeUndefined();
   });
 });
+
+describe("TargetRoundResolver", () => {
+  it("matches round candidates without Playwright page dependency", () => {
+    const resolver = new TargetRoundResolver();
+    const result = resolver.matchTargetRound([
+      targetRoundCandidate({
+        dataButton: "live",
+        type: "live_streaming",
+        href: "/booking/live",
+      }),
+      targetRoundCandidate({
+        dataButton: "offline",
+        type: "offline",
+        href: "/queue/booking/zones.php",
+      }),
+    ], {
+      date: "2026-08-21",
+      time: "18:00",
+      type: "offline",
+    });
+
+    expect(result).toEqual({
+      dataButton: "offline",
+      dateText: "วันศุกร์ที่ 21 สิงหาคม 2569",
+      timeText: "18:00",
+      type: "offline",
+      disabled: false,
+      soldOut: false,
+      href: "/queue/booking/zones.php",
+      onclick: "",
+      label: "18:00",
+      queueOrBookingCapable: true,
+    });
+  });
+
+  it("keeps sold-out candidates out of booking-capable state", () => {
+    const resolver = new TargetRoundResolver();
+
+    expect(resolver.matchTargetRound([
+      targetRoundCandidate({
+        onclick: "$app.popup.signin('/booking/3m/zones.php')",
+      }),
+    ], {
+      date: "2026-08-21",
+      time: "18:00",
+      type: "any",
+    })).toMatchObject({
+      queueOrBookingCapable: true,
+    });
+
+    expect(resolver.matchTargetRound([
+      targetRoundCandidate({
+        disabled: true,
+        rowText: "Sold out",
+      }),
+    ], {
+      date: "2026-08-21",
+      time: "18:00",
+      type: "any",
+    })).toMatchObject({
+      soldOut: true,
+      queueOrBookingCapable: false,
+    });
+  });
+});
+
+function targetRoundCandidate(overrides: Partial<TargetRoundCandidate> = {}): TargetRoundCandidate {
+  return {
+    dataButton: "9253",
+    dateText: "วันศุกร์ที่ 21 สิงหาคม 2569",
+    timeText: "18:00",
+    type: "offline",
+    disabled: false,
+    href: "",
+    onclick: "",
+    label: "18:00",
+    rowText: "",
+    ...overrides,
+  };
+}

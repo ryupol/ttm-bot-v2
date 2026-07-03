@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { commandFlowForPage, waitForFixedPageNavigation, zoneFromUrl } from "../src/bot/pageFlow.ts";
+import { commandFlowForPage, waitForFixedPageNavigation, zoneFromUrl } from "../src/bot/routing/PageFlowPolicy.ts";
 
 describe("pageFlow", () => {
   it("resumes current booking pages for go instead of restarting at event", () => {

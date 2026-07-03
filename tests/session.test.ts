@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasLoggedInMarker } from "../src/bot/session.ts";
+import { hasLoggedInMarker } from "../src/bot/auth/SessionMarkers.ts";
 
 describe("session", () => {
   it("detects logged-in menu markers", () => {
@@ -19,6 +19,21 @@ describe("session", () => {
           <li><a href="/all-event/">ทุกงานแสดง</a></li>
         </ul>
       </nav>
+    `)).toBe(false);
+  });
+
+  it("does not treat unauthenticated event page member menu template as logged in", () => {
+    expect(hasLoggedInMarker(`
+      <button class="btn-signin item d-none d-lg-inline-block"
+        onclick="window.location='https://event.thaiticketmajor.com/user/signin.php?redir=/concert/rookie-divos-concert.html'">
+        เข้าสู่ระบบ
+      </button>
+      <div style="display:none;">
+        <div class="popup" id="popup-member-menu">
+          <a class="item" href="/user/myticket.php?urId=">ตั๋วของฉัน</a>
+          <a class="item" href="/user/logout.php">ออกจากระบบ</a>
+        </div>
+      </div>
     `)).toBe(false);
   });
 

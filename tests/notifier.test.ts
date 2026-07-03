@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Notifier } from "../src/bot/notifier.ts";
+import { Notifier } from "../src/bot/observability/Notifier.ts";
 
 describe("Notifier", () => {
   afterEach(() => {

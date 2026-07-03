@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextAcquisitionReloadDelayMs, botReloadOffsetMs } from "../src/bot/queueSchedule.ts";
+import { nextAcquisitionReloadDelayMs, botReloadOffsetMs } from "../src/bot/queue/QueueReloadScheduler.ts";
 
 describe("queueSchedule", () => {
   it("uses pre-sale acquisition reload cadence", () => {

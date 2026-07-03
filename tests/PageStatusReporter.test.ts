@@ -1,7 +1,7 @@
 import type { Page } from "playwright";
 import { describe, expect, it, vi } from "vitest";
 import type { BotEvent } from "../src/ipc/types.ts";
-import { PageStatusReporter } from "../src/bot/services/PageStatusReporter.ts";
+import { PageStatusReporter } from "../src/bot/routing/PageStatusReporter.ts";
 
 describe("PageStatusReporter", () => {
   it("reports stopped before requiring page", async () => {

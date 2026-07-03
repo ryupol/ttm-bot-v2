@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type { Page } from "playwright";
 import { describe, expect, it, vi } from "vitest";
-import { attachForensicListeners, createRunForensics, redactForArtifact } from "../src/bot/forensics.ts";
+import { attachForensicListeners, createRunForensics, redactForArtifact } from "../src/bot/observability/Forensics.ts";
 
 describe("forensics", () => {
   it("creates run folder and writes JSONL events", () => {

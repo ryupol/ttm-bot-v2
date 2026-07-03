@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { selectSeatsOnFixedPage, type FixedPageResult } from "../src/bot/pages/fixed.ts";
+import { FixedPageSeatSelector, selectSeatsOnFixedPage, type FixedPageResult } from "../src/bot/booking/FixedPageSeatSelector.ts";
 import type { Concert } from "../src/config/schema.ts";
 
 describe("selectSeatsOnFixedPage", () => {
@@ -57,6 +57,24 @@ describe("selectSeatsOnFixedPage", () => {
     await expect(selectSeatsOnFixedPage(page, concert())).resolves.toEqual({ status: "confirmed", picks: [] });
   });
 
+});
+
+describe("FixedPageSeatSelector", () => {
+  it("exposes class seam with same fixed-page selection behavior", async () => {
+    const result: FixedPageResult = { status: "confirmed", picks: [{ id: "checkseat-A-1", row: "A", col: 1 }] };
+    const page = mockPage("https://example.com/fixed.php", result);
+    const selector = new FixedPageSeatSelector(concert());
+
+    await expect(selector.select(page)).resolves.toEqual(result);
+  });
+
+  it("keeps retry policy inside selector instance", async () => {
+    const page = mockPage("https://example.com/fixed.php", { status: "selection_not_applied" });
+    const selector = new FixedPageSeatSelector({ ...concert(), seat_retry_limit: 3 });
+
+    await expect(selector.select(page)).resolves.toEqual({ status: "no_picks" });
+    expect(page.evaluate).toHaveBeenCalledTimes(3);
+  });
 });
 
 function mockPage(url: string, result: FixedPageResult | { status: "selection_not_applied" }) {

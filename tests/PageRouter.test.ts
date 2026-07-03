@@ -1,7 +1,7 @@
 import type { Page } from "playwright";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PageRouter } from "../src/bot/services/PageRouter.ts";
-import type { PageKind } from "../src/bot/pages/classifier.ts";
+import { PageRouter } from "../src/bot/routing/PageRouter.ts";
+import type { PageKind } from "../src/bot/routing/PageClassifier.ts";
 import type { BotEvent } from "../src/ipc/types.ts";
 
 const mocks = vi.hoisted(() => ({
@@ -10,15 +10,15 @@ const mocks = vi.hoisted(() => ({
   classifyUnknownManualPage: vi.fn(),
 }));
 
-vi.mock("../src/bot/pages/classifier.ts", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../src/bot/pages/classifier.ts")>();
+vi.mock("../src/bot/routing/PageClassifier.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/bot/routing/PageClassifier.ts")>();
   return {
     ...actual,
     classifyCurrentPage: mocks.classifyCurrentPage,
   };
 });
 
-vi.mock("../src/bot/manualIntervention.ts", () => ({
+vi.mock("../src/bot/manual/ManualIntervention.ts", () => ({
   detectManualInterventionOnPage: mocks.detectManualInterventionOnPage,
   classifyUnknownManualPage: mocks.classifyUnknownManualPage,
 }));

@@ -3,7 +3,7 @@ import {
   classifyManualIntervention,
   classifyUnknownManualPage,
   transitionManualIntervention,
-} from "../src/bot/manualIntervention.ts";
+} from "../src/bot/manual/ManualIntervention.ts";
 
 describe("manualIntervention", () => {
   it("detects image captcha", () => {

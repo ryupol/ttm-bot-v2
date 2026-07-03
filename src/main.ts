@@ -174,8 +174,8 @@ function parseCli(): { bots?: number; concert?: string; settings?: string; accou
 
 function resolveWorkerUrl(): URL {
   return sourceIsTypescript()
-    ? new URL("./bot/worker.ts", import.meta.url)
-    : new URL("./bot/worker.js", import.meta.url);
+    ? new URL("./bot/runtime/worker.ts", import.meta.url)
+    : new URL("./bot/runtime/worker.js", import.meta.url);
 }
 
 function sourceIsTypescript(): boolean {

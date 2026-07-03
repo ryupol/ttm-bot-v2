@@ -71,41 +71,39 @@ Do not put config loading, worker-thread setup, or browser automation here.
 
 ## Bot
 
-`src/bot/` owns automation behavior.
+`src/bot/` owns automation behavior. Code is grouped by bot domain, not by generic layer buckets.
 
-Current useful subfolders:
-
-```text
-src/bot/pages/        page-specific Playwright actions/classification
-```
-
-Recommended next split:
+Current folders:
 
 ```text
-src/bot/worker.ts           worker-thread adapter only
-src/bot/workflow.ts         readable command/page flow
-src/bot/services/           stateful automation modules
-src/bot/models/             bot-domain data types
-src/bot/repositories/       persistence/file I/O adapters
-src/bot/utils/              reusable pure helpers only
+src/bot/auth/             login markers, login flow, access-block tracking
+src/bot/booking/          zone selection, fixed-page seat selection, round resolution
+src/bot/browser/          Playwright context/page lifecycle and window tiling
+src/bot/manual/           CAPTCHA/login/terms/manual-step detection and recovery
+src/bot/observability/    Telegram notifications, seat alerts, forensic artifacts
+src/bot/queue/            queue acquisition, queue hold, presence confirmation
+src/bot/routing/          page classification, page flow policy, current-page router
+src/bot/runtime/          worker-thread adapter and runtime orchestration
+src/bot/verification/     citizen ID and terms verification pages
 ```
 
-## Services
+Keep new bot files in one of these folders unless a new domain is clearly needed.
 
-Use service modules for stateful behavior or domain operations with meaningful depth.
+## Domain Boundaries
 
-Good candidates:
+Prefer domain-owned modules:
 
-- `BrowserSession`: Playwright context/page lifecycle.
-- `LoginService`: login detection and form fill.
-- `QueueAcquisitionService`: event-page watch, target round click, queue handoff.
-- `QueueHoldingService`: queue presence hold, queue manual alert, queue exit resume.
-- `BookingService`: zone selection, fixed-page seat selection, done states.
-- `ManualInterventionService`: manual-page detection, dedupe, alerts.
-- `VerificationService`: citizen ID and terms verification.
-- `ForensicReporter`: capture/event calls around decisions.
+- `auth/`: login state, login page interaction, HTTP access block responses.
+- `booking/`: event round choice, zone movement, seat selection, booking completion.
+- `browser/`: browser lifecycle, profile directory, Playwright window layout.
+- `manual/`: manual intervention classification, alert dedupe, wait/resume behavior.
+- `observability/`: notifications and forensic artifact write/capture logic.
+- `queue/`: queue entry watch, queue wait-page behavior, queue presence confirmation.
+- `routing/`: URL/HTML page kind classification and dispatch to domain services.
+- `runtime/`: composition of domain services and worker command handling.
+- `verification/`: `verify.php` and `verify_condition.php` actions.
 
-Avoid a giant service that owns all bot behavior.
+Avoid generic `services/`, `pages/`, or root-level `bot/*.ts` helpers. They hide ownership and inflate imports.
 
 ## Repositories
 
@@ -125,15 +123,13 @@ Those are domain logic, not repositories.
 
 ## Models
 
-Use `models/` for data shapes shared across bot modules.
+Do not create `models/` for small status/result types with clear ownership. Co-locate those with the module that creates or owns the concept:
 
-Good candidates:
+- manual intervention state in `manual/ManualIntervention.ts`
+- target round state in `booking/TargetRoundResolver.ts`
+- verification submit results in `verification/VerifyPage.ts`
 
-- `ManualIntervention`: manual intervention reason/state/transition.
-- `TargetRound`: resolved target round data from event page.
-- `Verification`: submit results for citizen ID and terms pages.
-
-Keep IPC-only message contracts in `src/ipc/types.ts` unless bot-domain types start leaking into multiple bot services.
+Create `models/` only when a data shape is truly cross-domain and has no clearer owner. Keep IPC-only message contracts in `src/ipc/types.ts`.
 
 ## Utils
 
@@ -154,25 +150,24 @@ Avoid:
 
 If helper belongs to one domain, prefer domain file name:
 
-- `zonePriority.ts`
-- `queueSchedule.ts`
-- `seatPicker.ts`
-- `pageFlow.ts`
+- `booking/ZoneSelector.ts`
+- `queue/QueueReloadScheduler.ts`
+- `booking/seatPicker.ts`
+- `routing/PageFlowPolicy.ts`
 
 ## Refactor Direction
 
-Preferred direction for `worker.ts`:
+Preferred direction for runtime changes:
 
-1. Make `worker.ts` a thin worker-thread adapter.
-2. Move command/page orchestration into `bot/workflow.ts`.
-3. Extract browser lifecycle into `services/BrowserSession.ts`.
-4. Extract queue and booking flows into focused services.
-5. Move only repeated pure helpers into named `utils/` files.
+1. Keep `runtime/worker.ts` as thin worker-thread adapter.
+2. Keep command/page orchestration in `runtime/BotRuntime.ts`.
+3. Put stateful domain operations in their owning domain folder.
+4. Move only repeated pure helpers into named domain files.
 
 Target read shape:
 
 ```ts
-const runtime = createBotWorkerRuntime(workerData, parentPort);
+const runtime = createBotRuntime(workerData, parentPort);
 void runtime.start();
 ```
 
