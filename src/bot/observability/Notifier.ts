@@ -32,7 +32,7 @@ export class Notifier {
         return;
       } catch (error) {
         lastError = error;
-        if (attempt === 1) await sleep(1000);
+        if (attempt === 1) await sleep(1000 + Math.random() * 1000);
       }
     }
     throw lastError instanceof Error ? lastError : new Error(String(lastError));

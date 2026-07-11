@@ -4,6 +4,7 @@ import type { Notifier } from "../observability/Notifier.ts";
 import type { ForensicCallbacks } from "../observability/ForensicReporter.ts";
 import { createManualAlertDeduper } from "./ManualAlertDeduper.ts";
 import { waitForManualInterventionToClear } from "./ManualRecovery.ts";
+import { errorMessage } from "../../utils/errors.ts";
 
 export type ManualInterventionServiceOptions = {
   botId: number;
@@ -60,8 +61,4 @@ export class ManualInterventionService {
       this.options.emit({ type: "log", botId: this.options.botId, message: `telegram failed: ${errorMessage(error)}` });
     }
   }
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

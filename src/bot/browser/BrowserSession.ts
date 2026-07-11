@@ -2,6 +2,7 @@ import path from "node:path";
 import { chromium, type BrowserContext, type Page, type Response } from "playwright";
 import type { Settings } from "../../config/schema.ts";
 import { tileBrowserWindow } from "./WindowLayoutManager.ts";
+import { errorMessage } from "../../utils/errors.ts";
 
 export type BrowserSessionOptions = {
   rootDir: string;
@@ -48,7 +49,10 @@ export class BrowserSession {
   }
 
   async close(): Promise<void> {
+    if (this.page && this.options.onResponse) this.page.off("response", this.options.onResponse);
     await this.context?.close().catch(() => undefined);
+    this.page = undefined;
+    this.context = undefined;
   }
 
   getPage(): Page | undefined {
@@ -59,8 +63,4 @@ export class BrowserSession {
     if (!this.page) throw new Error("browser page not ready");
     return this.page;
   }
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

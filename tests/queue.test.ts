@@ -12,7 +12,7 @@ describe("holdQueue", () => {
     vi.restoreAllMocks();
   });
 
-  it("redirect from queue to verify page emits manual intervention without queue exit", async () => {
+  it("redirect from queue to verify page exits queue without manual alert", async () => {
     vi.useFakeTimers();
     const page = mockPage("https://example.com/queue/wait");
     const notifier = mockNotifier();
@@ -25,20 +25,9 @@ describe("holdQueue", () => {
     await vi.advanceTimersByTimeAsync(1200);
     await pending;
 
-    expect(events).toContainEqual({
-      type: "state",
-      botId: 7,
-      state: "MANUAL_INTERVENTION",
-      detail: "Verification required",
-    });
-    expect(events).toContainEqual({
-      type: "alert",
-      botId: 7,
-      kind: "manual_intervention",
-      message: "Bot 7: manual intervention (Verification required) - solve in browser",
-    });
+    expect(events.some((event) => event.type === "alert" && event.kind === "manual_intervention")).toBe(false);
     expect(events.some((event) => event.type === "alert" && event.kind === "queue_exit")).toBe(false);
-    expect(notifier.send).toHaveBeenCalledWith("Bot 7: manual intervention (Verification required) - solve in browser");
+    expect(notifier.send).not.toHaveBeenCalled();
   });
 
   it("configured visible captcha selector emits manual intervention once", async () => {
@@ -216,6 +205,36 @@ describe("holdQueue", () => {
     expect(forensicEvents).toContainEqual(["queue-presence-confirm", "clicked"]);
   });
 
+  it("auto-clicks Queue-it join waiting room under queue guards", async () => {
+    vi.useFakeTimers();
+    const button = mockLocator({ text: "Join waiting room" });
+    const page = mockPage("https://wait.thaiticketmajor.com/view?c=ticketmasterasia&e=thb4d7f343883096b6f2", {
+      html: `
+        <div id="waitingroomentry-content-holder">
+          <button class="botdetect-button btn">Join waiting room</button>
+        </div>
+      `,
+      locators: new Map([[".botdetect-button.btn", button]]),
+    });
+    const notifier = mockNotifier();
+    const forensicEvents: Array<[string, string]> = [];
+
+    const pending = holdQueue(page, concert(), 6, notifier, () => undefined, {
+      forensics: {
+        event: (action, result) => {
+          forensicEvents.push([action, result]);
+        },
+      },
+    });
+
+    await vi.waitFor(() => expect(button.click).toHaveBeenCalledTimes(1));
+    page.setUrl("https://example.com/booking/fixed.php");
+    await vi.advanceTimersByTimeAsync(2500);
+    await pending;
+
+    expect(forensicEvents).toContainEqual(["queue-join-waiting-room", "clicked"]);
+  });
+
   it("rate-limits Queue-it visitor presence clicks", async () => {
     vi.useFakeTimers();
     const button = mockLocator({ text: "Yes, I'm here" });
@@ -361,6 +380,51 @@ describe("QueuePresenceConfirmer", () => {
     await expect(confirmer.tryConfirm(page)).resolves.toEqual({ status: "clicked", clickedAt: 1_000 });
     expect(succeedingButton.click).toHaveBeenCalledTimes(1);
   });
+
+  it("does not click join waiting room outside wait host", async () => {
+    const button = mockLocator({ text: "Join waiting room" });
+    const page = mockPage("https://example.com/view?c=ticketmasterasia", {
+      html: queueJoinWaitingRoomHtml(),
+      locators: new Map([[".botdetect-button.btn", button]]),
+    });
+    const confirmer = new QueuePresenceConfirmer({
+      botId: 4,
+      sleep: async () => undefined,
+    });
+
+    await expect(confirmer.tryConfirm(page)).resolves.toEqual({ status: "none" });
+    expect(button.click).not.toHaveBeenCalled();
+  });
+
+  it("does not click disabled join waiting room button", async () => {
+    const button = mockLocator({ enabled: false, text: "Join waiting room" });
+    const page = mockPage("https://wait.thaiticketmajor.com/view?c=ticketmasterasia", {
+      html: queueJoinWaitingRoomHtml(),
+      locators: new Map([[".botdetect-button.btn", button]]),
+    });
+    const confirmer = new QueuePresenceConfirmer({
+      botId: 5,
+      sleep: async () => undefined,
+    });
+
+    await expect(confirmer.tryConfirm(page)).resolves.toEqual({ status: "none" });
+    expect(button.click).not.toHaveBeenCalled();
+  });
+
+  it("does not click join waiting room selector when text mismatches", async () => {
+    const button = mockLocator({ text: "Leave waiting room" });
+    const page = mockPage("https://wait.thaiticketmajor.com/view?c=ticketmasterasia", {
+      html: queueJoinWaitingRoomHtml(),
+      locators: new Map([[".botdetect-button.btn", button]]),
+    });
+    const confirmer = new QueuePresenceConfirmer({
+      botId: 6,
+      sleep: async () => undefined,
+    });
+
+    await expect(confirmer.tryConfirm(page)).resolves.toEqual({ status: "none" });
+    expect(button.click).not.toHaveBeenCalled();
+  });
 });
 
 type MockPage = Page & {
@@ -407,6 +471,14 @@ function queuePresenceHtml(): string {
   `;
 }
 
+function queueJoinWaitingRoomHtml(): string {
+  return `
+    <div id="waitingroomentry-content-holder">
+      <button class="botdetect-button btn">Join waiting room</button>
+    </div>
+  `;
+}
+
 function mockLocator(
   options: { visible?: boolean; enabled?: boolean; text?: string; clickError?: Error } = {},
 ): MockLocator {
@@ -434,6 +506,8 @@ function concert(): Concert {
     event_url: "https://www.thaiticketmajor.com/performance/example.html",
     event_date: "2026-12-15",
     zone_priority: [],
+    max_zone_cycles: 0,
+    zone_cycle_alert_every: 5,
     ticket_count: 1,
     seat_retry_limit: 2,
     seat_strategy: { prefer_rows: [], avoid_rows: [], prefer_center: true },

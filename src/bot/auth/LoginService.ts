@@ -69,9 +69,9 @@ export class LoginService {
 
   private async isLoggedIn(p: Page): Promise<boolean> {
     for (let attempt = 0; attempt < 10; attempt += 1) {
-      await p.waitForTimeout(1000);
       const html = await p.content().catch(() => "");
       if (hasLoggedInMarker(html)) return true;
+      await p.waitForTimeout(1000);
     }
     return false;
   }

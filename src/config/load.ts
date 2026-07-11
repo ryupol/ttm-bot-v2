@@ -34,11 +34,30 @@ export function loadAppConfig(options: LoadOptions = {}): {
   const accountFile = AccountFileSchema.parse(readYaml(accountsPath));
   const concert = ConcertSchema.parse(readYaml(concertPath));
 
+  const accounts = accountFile.accounts.map(resolveAccount);
+  assertConfiguredEnvVarsResolve(accounts, settings);
+
   return {
     config: { rootDir, settings, concert },
-    accounts: accountFile.accounts.map(resolveAccount),
+    accounts,
     accountRouting: { reuseFirstAccount: accountFile.reuse_first_account },
   };
+}
+
+function assertConfiguredEnvVarsResolve(accounts: ResolvedAccount[], settings: { telegram: { enabled: boolean; token_env: string; chat_id_env: string } }): void {
+  const missing: string[] = [];
+  for (const account of accounts) {
+    if (account.email_env && !account.email) missing.push(`${account.email_env} (account ${account.id} email)`);
+    if (account.pass_env && !account.password) missing.push(`${account.pass_env} (account ${account.id} password)`);
+    if (account.citizen_id_env && !account.citizenId) missing.push(`${account.citizen_id_env} (account ${account.id} citizen id)`);
+  }
+  if (settings.telegram.enabled) {
+    if (!process.env[settings.telegram.token_env]) missing.push(`${settings.telegram.token_env} (telegram token)`);
+    if (!process.env[settings.telegram.chat_id_env]) missing.push(`${settings.telegram.chat_id_env} (telegram chat id)`);
+  }
+  if (missing.length > 0) {
+    throw new Error(`Missing env vars referenced by config: ${missing.join(", ")}. Check secrets/.env`);
+  }
 }
 
 function readYaml(filePath: string): unknown {

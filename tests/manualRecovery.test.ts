@@ -42,6 +42,54 @@ describe("manualRecovery", () => {
 
     expect(result).toBe("stopped");
   });
+
+  it("clears when captcha advances to routable verify page", async () => {
+    const page = mockPage([
+      {
+        url: "https://gatekeeper.thaiticketmajor.com/stacks/sep/?ks=redacted",
+        html: '<main aria-label="CAPTCHA verification"><h1>Verify You Are Human</h1></main>',
+      },
+      {
+        url: "https://booking.thaiticketmajor.com/booking/3m/verify.php?query=598",
+        html: '<input id="txt_verifycode" name="txt_verifycode">',
+      },
+    ]);
+    const onCleared = vi.fn();
+
+    const result = await waitForManualInterventionToClear(page, {
+      shouldStop: () => false,
+      pollMs: 1,
+      onCleared,
+    });
+
+    expect(result).toBe("cleared");
+    expect(onCleared).toHaveBeenCalledTimes(1);
+    expect(page.waitForTimeout).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not immediately clear when waiting starts on verify page", async () => {
+    const page = mockPage([
+      {
+        url: "https://booking.thaiticketmajor.com/booking/3m/verify.php?query=598",
+        html: '<input id="txt_verifycode" name="txt_verifycode">',
+      },
+      {
+        url: "https://booking.thaiticketmajor.com/booking/3m/zones.php?query=598",
+        html: "<html></html>",
+      },
+    ]);
+    const onCleared = vi.fn();
+
+    const result = await waitForManualInterventionToClear(page, {
+      shouldStop: () => false,
+      pollMs: 1,
+      onCleared,
+    });
+
+    expect(result).toBe("cleared");
+    expect(onCleared).toHaveBeenCalledTimes(1);
+    expect(page.waitForTimeout).toHaveBeenCalledTimes(1);
+  });
 });
 
 function mockPage(sequence: Array<{ url: string; html: string }>) {

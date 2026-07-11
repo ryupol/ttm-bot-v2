@@ -73,7 +73,7 @@ export async function holdQueue(
   if (options.shouldStop?.()) return;
 
   const manual = await detectManualOrConfiguredCaptcha(page, captcha_selector, puzzle_selector);
-  if (manual.present) {
+  if (manual.present && !isRoutableQueueExit(page.url())) {
     forensics?.event?.("manual-intervention", "after-queue", { reason: manual.reason });
     if (manualVisible) return;
     await emitManualIntervention(manual.reason, manual.userMessage, page.url(), botId, notifier, emit, forensics, "manual-intervention-appears", options.shouldEmitManualAlert);
@@ -117,6 +117,18 @@ async function classifyQueueExit(page: Page): Promise<string> {
   if (kind !== "unknown") return kind;
   const html = await page.content().catch(() => "");
   return classifyPage(url, html);
+}
+
+function isRoutableQueueExit(url: string): boolean {
+  return [
+    "verify",
+    "verify_condition",
+    "zones",
+    "fixed",
+    "payment",
+    "enroll",
+    "error",
+  ].includes(classifyPage(url));
 }
 
 async function emitManualIntervention(

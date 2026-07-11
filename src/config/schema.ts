@@ -69,6 +69,8 @@ export const ConcertSchema = z.object({
   queue_start: z.string().datetime({ offset: true }).optional(),
   sale_start: z.string().datetime({ offset: true }).optional(),
   zone_priority: z.array(z.string()).default([]),
+  max_zone_cycles: z.number().int().nonnegative().default(0),
+  zone_cycle_alert_every: z.number().int().positive().default(5),
   ticket_count: z.number().int().positive(),
   seat_retry_limit: z.number().int().positive().default(7),
   seat_strategy: SeatStrategySchema,

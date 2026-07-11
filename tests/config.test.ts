@@ -23,6 +23,18 @@ describe("loadAppConfig", () => {
     expect(accounts[0].email).toBe("a@example.com");
   });
 
+  it("throws when a configured env var is not set", () => {
+    const root = path.join(tmpdir(), `ttm-config-missing-env-${Date.now()}`);
+    mkdirSync(path.join(root, "config"), { recursive: true });
+    mkdirSync(path.join(root, "secrets"), { recursive: true });
+    writeFileSync(path.join(root, "config/settings.yaml"), settingsYaml());
+    writeFileSync(path.join(root, "config/accounts.yaml"), "accounts:\n  - id: 1\n    email_env: TTM_TEST_MISSING_EMAIL\n");
+    writeFileSync(path.join(root, "config/concert.yaml"), concertYaml());
+    delete process.env.TTM_TEST_MISSING_EMAIL;
+
+    expect(() => loadAppConfig({ rootDir: root })).toThrow(/TTM_TEST_MISSING_EMAIL/);
+  });
+
   it("loads account reuse routing", () => {
     const root = path.join(tmpdir(), `ttm-config-reuse-${Date.now()}`);
     mkdirSync(path.join(root, "config"), { recursive: true });
