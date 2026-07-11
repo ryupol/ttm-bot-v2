@@ -504,7 +504,6 @@ function mockNotifier(): Notifier {
 function concert(): Concert {
   return {
     event_url: "https://www.thaiticketmajor.com/performance/example.html",
-    event_date: "2026-12-15",
     zone_priority: [],
     max_zone_cycles: 0,
     zone_cycle_alert_every: 5,

@@ -1,0 +1,15 @@
+# Copy this file, rename it, then replace every example value.
+event_url: https://www.thaiticketmajor.com/performance/example.html
+
+# Date and time printed on the TTM round you want to book.
+target_round:
+  date: "2027-12-15"
+  time: "18:00"
+  # type: offline # Optional: offline (default), live_streaming, rerun, or any.
+
+# Ticket-sale opening time. Keep +07:00 for Thailand time.
+sale_start: "2027-10-01T10:00:00+07:00"
+
+# Try zones left to right. Use zone codes shown by TTM.
+zone_priority: ["A1", "A2", "B1"]
+ticket_count: 2
