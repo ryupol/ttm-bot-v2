@@ -58,6 +58,7 @@ Targets are `all` or one bot number, for example `login all`, `go 4`, or `stop 4
 | `login all` / `login N` | Manual retry when startup login was disabled, interrupted, or bot shows `Login required`. | Checks login state, fills username/password if needed, and waits for manual submit. Skips payment/enroll pages. |
 | `check all` | Diagnostic command after manual browser changes. | Reads current URL/HTML, classifies each bot page, and updates TUI state without clicking or navigating. |
 | `go N` / `go all` | Main start/resume command. | Starts queue acquisition from event/home, holds queue pages, resumes zones/fixed pages, and marks payment/enroll pages done. |
+| `zone N SC SD SE` / `zone all SC SD SE` | Change zone priority during the current run. | Updates runtime zone priority only; does not edit YAML. Bots on `zones.php` use the new priority immediately. Bots already on `fixed.php` finish one fast scan, then use the new priority for the next zone. |
 | `stop N` | Stop one bot or cancel bad run. | Stops bot `N`. Browser remains open. |
 | `reset N` | Return bot to base site/manual login state. | Navigates to `base_url` and marks bot `IDLE`. |
 | `log N` | Focus logs for one bot. | Filters TUI log panel to bot `N`. |
@@ -94,6 +95,8 @@ Expected initial state: `WATCHING_QUEUE_OPEN`.
 6. If manual step appears, bot enters `MANUAL_INTERVENTION`. Solve in browser, then use `go N` if bot does not continue automatically.
 
 7. On seat page, bot enters `BOOKING` and selects seats using configured zone priority and seat strategy.
+
+8. If preferred zones change during booking, use `zone all SC SD SE` or `zone N SC SD SE`. This affects the current run only. Restart reloads zone priority from YAML.
 
 ## Emergency Notes
 
