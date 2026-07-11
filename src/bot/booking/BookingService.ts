@@ -4,6 +4,7 @@ import type { BotEvent, PickedSeat } from "../../ipc/types.ts";
 import { waitForFixedPageNavigation, zoneFromUrl } from "../routing/PageFlowPolicy.ts";
 import { classifyPage, type PageKind } from "../routing/PageClassifier.ts";
 import { formatSeatsSelectedMessage } from "../observability/SeatAlert.ts";
+import { errorMessage } from "../../utils/errors.ts";
 import { selectSeatsOnFixedPage } from "./FixedPageSeatSelector.ts";
 import { nextZoneAfter } from "./ZoneSelector.ts";
 
@@ -27,10 +28,27 @@ export class BookingService {
   private readonly options: BookingServiceOptions;
   private zonesBaseUrl: string | undefined;
   private currentBookingZone: string | undefined;
-  private readonly zonesTried = new Set<string>();
+  private zonesTried = new Set<string>();
+  private zoneCycles = 0;
+  private selectionNotAppliedStreak = 0;
+  private bookSeatsDepth = 0;
+  private runtimeZonePriority: string[] | undefined;
 
   constructor(options: BookingServiceOptions) {
     this.options = options;
+  }
+
+  setZonePriority(zones: string[]): void {
+    if (zones.length === 0) {
+      this.options.emit({ type: "log", botId: this.options.botId, message: "zone priority update ignored: empty zone list" });
+      return;
+    }
+
+    this.runtimeZonePriority = [...zones];
+    this.zonesTried = new Set();
+    this.zoneCycles = 0;
+    this.options.forensics.event("zone-priority", "updated", { zones });
+    this.options.emit({ type: "log", botId: this.options.botId, message: `zone priority updated: ${zones.join(", ")}` });
   }
 
   async recoverFromErrorPage(p: Page): Promise<void> {
@@ -50,6 +68,21 @@ export class BookingService {
   }
 
   async bookSeats(p: Page): Promise<void> {
+    // bookSeats can re-enter via enterNextZone -> handleCurrentPage -> router;
+    // only a fresh outermost call resets cycle bookkeeping
+    if (this.bookSeatsDepth === 0) {
+      this.zoneCycles = 0;
+      this.selectionNotAppliedStreak = 0;
+    }
+    this.bookSeatsDepth += 1;
+    try {
+      await this.bookSeatsLoop(p);
+    } finally {
+      this.bookSeatsDepth -= 1;
+    }
+  }
+
+  private async bookSeatsLoop(p: Page): Promise<void> {
     while (!this.options.shouldStop()) {
       const zone = zoneFromUrl(p.url()) ?? this.currentBookingZone;
 
@@ -57,9 +90,31 @@ export class BookingService {
       await this.options.forensics.captureDecision("before-seat-selection");
       this.options.forensics.event("seat-selection", "start", { zone });
       const result = await selectSeatsOnFixedPage(p, this.options.concert);
-      if (!result || result.status === "no_seats" || result.status === "no_picks") {
+      if (!result) {
+        // navigated off fixed.php mid-selection (login/error/queue redirect) —
+        // not a sold-out signal; let the router dispatch the new page
         await this.options.forensics.captureDecision("after-seat-selection");
-        this.options.forensics.event("seat-selection", result?.status ?? "no-result", { zone });
+        this.options.forensics.event("seat-selection", "left-fixed-page", { zone, url: p.url() });
+        this.options.emit({ type: "log", botId: this.options.botId, message: `left fixed page during selection: ${p.url()}` });
+        await this.options.handleCurrentPage();
+        return;
+      }
+      if (result.status === "selection_not_applied") {
+        // seats existed but site JS rejected the clicks — retry same zone before moving on
+        this.selectionNotAppliedStreak += 1;
+        await this.options.forensics.captureDecision("after-seat-selection");
+        this.options.forensics.event("seat-selection", "selection_not_applied", { zone, streak: this.selectionNotAppliedStreak });
+        if (this.selectionNotAppliedStreak < 3) {
+          this.options.emit({ type: "log", botId: this.options.botId, message: `selection not applied in ${zone ?? "unknown"}; retrying same zone (${this.selectionNotAppliedStreak}/3)` });
+          await p.reload({ waitUntil: "domcontentloaded" }).catch(() => undefined);
+          continue;
+        }
+        this.options.emit({ type: "log", botId: this.options.botId, message: `selection not applied ${this.selectionNotAppliedStreak}x in ${zone ?? "unknown"}; trying next zone` });
+      }
+      if (result.status === "no_seats" || result.status === "no_picks" || result.status === "selection_not_applied") {
+        this.selectionNotAppliedStreak = 0;
+        await this.options.forensics.captureDecision("after-seat-selection");
+        this.options.forensics.event("seat-selection", result.status, { zone });
         const securedKind = classifyPage(p.url());
         if (securedKind === "payment" || securedKind === "enroll") {
           this.options.forensics.event("booking", "secured-page-after-selection", { zone, pageKind: securedKind });
@@ -77,10 +132,11 @@ export class BookingService {
           }
         }
 
-        const nextZone = nextZoneAfter(zone, this.options.concert.zone_priority, this.zonesTried);
-        if (nextZone && await this.goToZone(p, nextZone)) {
-          this.zonesTried.add(nextZone);
-          this.currentBookingZone = nextZone;
+        const next = nextZoneAfter(zone, this.effectiveZonePriority(), this.zonesTried);
+        if (next.cycled && !await this.startNextZoneCycle(zone)) return;
+        if (next.zone && await this.goToZone(p, next.zone)) {
+          this.zonesTried.add(next.zone);
+          this.currentBookingZone = next.zone;
           continue;
         }
 
@@ -115,7 +171,9 @@ export class BookingService {
     this.zonesBaseUrl = p.url();
     const currentZone = zoneFromUrl(p.url());
     if (currentZone) this.zonesTried.add(currentZone);
-    const nextZone = nextZoneAfter(currentZone, this.options.concert.zone_priority, this.zonesTried);
+    const next = nextZoneAfter(currentZone, this.effectiveZonePriority(), this.zonesTried);
+    if (next.cycled && !await this.startNextZoneCycle(currentZone)) return false;
+    const nextZone = next.zone;
     if (!nextZone) {
       this.options.emit({ type: "state", botId: this.options.botId, state: "AWAITING_USER", detail: "Zone page; no zone_priority configured" });
       return false;
@@ -135,6 +193,31 @@ export class BookingService {
     this.options.forensics.event("zone-selection", "done", { zone: nextZone });
     await this.options.handleCurrentPage();
     return true;
+  }
+
+  // Full pass over zone_priority found nothing; competitors may release held
+  // seats, so cycling continues on purpose — with backoff and visibility.
+  private async startNextZoneCycle(lastZone: string | undefined): Promise<boolean> {
+    this.zoneCycles += 1;
+    this.zonesTried = new Set();
+    const { max_zone_cycles, zone_cycle_alert_every } = this.options.concert;
+
+    if (max_zone_cycles > 0 && this.zoneCycles > max_zone_cycles) {
+      const message = `Bot ${this.options.botId}: no seats after ${max_zone_cycles} zone cycles - stopping`;
+      this.options.forensics.event("booking", "zone-cycles-exhausted", { cycles: this.zoneCycles - 1, lastZone });
+      this.options.emit({ type: "alert", botId: this.options.botId, kind: "no_seats", message, zone: lastZone });
+      await this.options.notify(message);
+      this.options.emit({ type: "state", botId: this.options.botId, state: "AWAITING_USER", detail: "No seats after max zone cycles" });
+      return false;
+    }
+
+    this.options.forensics.event("booking", "zone-cycle", { cycle: this.zoneCycles, lastZone });
+    this.options.emit({ type: "log", botId: this.options.botId, message: `zone cycle #${this.zoneCycles}: all zones tried, no seats; retrying all zones` });
+    if (this.zoneCycles % zone_cycle_alert_every === 0) {
+      await this.options.notify(`Bot ${this.options.botId}: still no seats after ${this.zoneCycles} zone cycles; retrying`);
+    }
+    await sleep(3000 + Math.random() * 5000);
+    return !this.options.shouldStop();
   }
 
   private async readPaymentPageSeats(p: Page): Promise<PickedSeat[]> {
@@ -207,10 +290,14 @@ export class BookingService {
       return false;
     }
   }
+
+  private effectiveZonePriority(): string[] {
+    return this.runtimeZonePriority ?? this.options.concert.zone_priority;
+  }
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function replaceZoneInUrl(url: string, zone: string): string | undefined {

@@ -13,6 +13,16 @@ describe("commands", () => {
     expect(parseCommand("check 2")).toEqual({ type: "check", target: 2 });
   });
 
+  it("parses runtime zone priority command", () => {
+    expect(parseCommand("zone all SC SD SE")).toEqual({ type: "zone", target: "all", zones: ["SC", "SD", "SE"] });
+    expect(parseCommand("zone 2 A2 A3")).toEqual({ type: "zone", target: 2, zones: ["A2", "A3"] });
+  });
+
+  it("rejects zone command without zones", () => {
+    expect(() => parseCommand("zone all")).toThrow("Usage: zone all|N ZONE...");
+    expect(() => parseCommand("zone 2")).toThrow("Usage: zone all|N ZONE...");
+  });
+
   it("rejects unknown commands", () => {
     expect(() => parseCommand("launch all")).toThrow("Unknown command");
     expect(() => parseCommand("arm all")).toThrow("Unknown command");

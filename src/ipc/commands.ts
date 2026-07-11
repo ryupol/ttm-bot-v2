@@ -1,10 +1,10 @@
 import type { MainCommand } from "./types.ts";
 
-const TARGET_COMMANDS = new Set(["login", "check", "go", "stop", "reset", "log"]);
+const TARGET_COMMANDS = new Set(["login", "check", "go", "stop", "reset", "log", "zone"]);
 
 export function parseCommand(input: string): MainCommand {
   const parts = input.trim().split(/\s+/).filter(Boolean);
-  const [verb, arg] = parts;
+  const [verb, arg, ...rest] = parts;
   if (!verb) throw new Error("Empty command");
 
   if (!TARGET_COMMANDS.has(verb)) {
@@ -13,6 +13,11 @@ export function parseCommand(input: string): MainCommand {
 
   if (!arg) throw new Error(`Usage: ${verb} all|N`);
   const target = parseTarget(arg);
+  if (verb === "zone") {
+    if (rest.length === 0) throw new Error("Usage: zone all|N ZONE...");
+    return { type: "zone", target, zones: rest };
+  }
+
   return { type: verb as MainCommand["type"], target } as MainCommand;
 }
 

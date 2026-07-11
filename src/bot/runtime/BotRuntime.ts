@@ -15,6 +15,7 @@ import { commandFlowForPage } from "../routing/PageFlowPolicy.ts";
 import { PageRouter } from "../routing/PageRouter.ts";
 import { PageStatusReporter } from "../routing/PageStatusReporter.ts";
 import { VerificationService } from "../verification/VerificationService.ts";
+import { errorMessage } from "../../utils/errors.ts";
 
 export function createBotRuntime(init: WorkerInit, port: MessagePort): BotRuntime {
   return new BotRuntime(init, port);
@@ -35,6 +36,7 @@ class BotRuntime {
   private readonly queueHolding: QueueHoldingService;
   private readonly verification: VerificationService;
   private stopped = false;
+  private runningCommand: BotCommand["type"] | undefined;
   private readonly notifier: ReturnType<typeof createNotifierFromEnv>;
 
   constructor(init: WorkerInit, port: MessagePort) {
@@ -167,15 +169,29 @@ class BotRuntime {
         process.exit(0);
       }
 
-      this.stopped = false;
+      if (command.type === "set_zone_priority") {
+        this.booking.setZonePriority(command.zones);
+        return;
+      }
+
+      if (this.runningCommand) {
+        this.emit({ type: "log", botId: this.init.botId, message: `command ${command.type} ignored: ${this.runningCommand} still running (use stop first)` });
+        return;
+      }
+      this.runningCommand = command.type;
+      // check is read-only; it must not cancel an in-flight stop
+      if (command.type !== "check") this.stopped = false;
       if (!this.session.getPage()) await this.launch();
 
       if (command.type === "login") await this.loginService.login(this.requirePage());
       else if (command.type === "check") await this.checkStatus();
       else if (command.type === "go") await this.go(command.scheduledFor);
       else if (command.type === "reset") await this.reset();
+      else this.emit({ type: "log", botId: this.init.botId, message: `unknown command ignored: ${(command as { type: string }).type}` });
     } catch (error) {
       this.emitError(error);
+    } finally {
+      if (command.type !== "stop" && command.type !== "shutdown") this.runningCommand = undefined;
     }
   }
 
@@ -266,8 +282,4 @@ class BotRuntime {
     this.emit({ type: "error", botId: this.init.botId, message: errorMessage(error), stack: error instanceof Error ? error.stack : undefined });
     this.emit({ type: "state", botId: this.init.botId, state: "ERROR", detail: errorMessage(error) });
   }
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

@@ -20,6 +20,7 @@ export type BotCommand =
   | { type: "check" }
   | { type: "go"; scheduledFor?: string }
   | { type: "stop" }
+  | { type: "set_zone_priority"; zones: string[] }
   | { type: "shutdown" }
   | { type: "reset" };
 
@@ -29,6 +30,7 @@ export type MainCommand =
   | { type: "go"; target: CommandTarget }
   | { type: "stop"; target: CommandTarget }
   | { type: "reset"; target: CommandTarget }
+  | { type: "zone"; target: CommandTarget; zones: string[] }
   | { type: "log"; target: CommandTarget };
 
 export type BotAlertKind =

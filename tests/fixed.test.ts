@@ -15,16 +15,54 @@ describe("selectSeatsOnFixedPage", () => {
   });
 
   it("retries no-seat result up to retry limit", async () => {
-    const page = mockPage("https://example.com/fixed.php", { status: "no_seats" });
+    const page = mockPage("https://example.com/fixed.php", { status: "no_seats" }, { availableSeatCount: 1 });
     await selectSeatsOnFixedPage(page, { ...concert(), seat_retry_limit: 3 });
-    expect(page.evaluate).toHaveBeenCalledTimes(3);
+    expect(page.evaluate).toHaveBeenCalledTimes(6);
   });
 
   it("retries selection alert results up to retry limit", async () => {
-    const page = mockPage("https://example.com/fixed.php", { status: "selection_not_applied" });
+    const page = mockPage("https://example.com/fixed.php", { status: "selection_not_applied" }, { availableSeatCount: 1 });
 
-    await expect(selectSeatsOnFixedPage(page, { ...concert(), seat_retry_limit: 3 })).resolves.toEqual({ status: "no_picks" });
-    expect(page.evaluate).toHaveBeenCalledTimes(3);
+    await expect(selectSeatsOnFixedPage(page, { ...concert(), seat_retry_limit: 3 })).resolves.toEqual({ status: "selection_not_applied" });
+    expect(page.evaluate).toHaveBeenCalledTimes(6);
+  });
+
+  it("passes rejected seats to the next selection retry", async () => {
+    const selectionParams: Array<{ rejectedSeatIds: string[] }> = [];
+    const page = {
+      url: () => "https://example.com/fixed.php",
+      evaluate: vi.fn().mockImplementation((_, params) => {
+        if (!params) return Promise.resolve(2);
+        selectionParams.push(params);
+        if (selectionParams.length === 1) {
+          return Promise.resolve({
+            status: "selection_not_applied",
+            rejectedSeatIds: ["checkseat-A-1"],
+          });
+        }
+        return Promise.resolve({
+          status: "confirmed",
+          picks: [{ id: "checkseat-A-2", row: "A", col: 2 }],
+        });
+      }),
+      waitForFunction: vi.fn().mockResolvedValue(undefined),
+      waitForTimeout: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await expect(selectSeatsOnFixedPage(page, { ...concert(), seat_retry_limit: 3 })).resolves.toEqual({
+      status: "confirmed",
+      picks: [{ id: "checkseat-A-2", row: "A", col: 2 }],
+    });
+    expect(selectionParams).toHaveLength(2);
+    expect(selectionParams[0].rejectedSeatIds).toEqual([]);
+    expect(selectionParams[1].rejectedSeatIds).toEqual(["checkseat-A-1"]);
+  });
+
+  it("returns no_seats fast when seat map has only unavailable seats", async () => {
+    const page = mockPage("https://example.com/fixed.php", { status: "confirmed", picks: [] }, { availableSeatCount: 0 });
+
+    await expect(selectSeatsOnFixedPage(page, { ...concert(), seat_retry_limit: 3 })).resolves.toEqual({ status: "no_seats" });
+    expect(page.evaluate).toHaveBeenCalledTimes(1);
   });
 
   it("treats enroll redirect as confirmed", async () => {
@@ -57,6 +95,37 @@ describe("selectSeatsOnFixedPage", () => {
     await expect(selectSeatsOnFixedPage(page, concert())).resolves.toEqual({ status: "confirmed", picks: [] });
   });
 
+  it("does not confirm when execution-context loss lands on a non-booking page", async () => {
+    let currentUrl = "https://example.com/fixed.php";
+    const page = {
+      url: () => currentUrl,
+      evaluate: vi.fn().mockImplementation(() => {
+        currentUrl = "https://example.com/user/signin.php";
+        return Promise.reject(new Error("page.evaluate: Execution context was destroyed, most likely because of a navigation."));
+      }),
+      waitForFunction: vi.fn().mockResolvedValue(undefined),
+      waitForTimeout: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await expect(selectSeatsOnFixedPage(page, concert())).resolves.toBeNull();
+  });
+
+  it("returns null instead of no_seats when seat wait ends off the fixed page", async () => {
+    let currentUrl = "https://example.com/fixed.php";
+    const page = {
+      url: () => currentUrl,
+      evaluate: vi.fn(),
+      waitForFunction: vi.fn().mockImplementation(() => {
+        currentUrl = "https://example.com/queue";
+        return Promise.reject(new Error("navigated"));
+      }),
+      waitForTimeout: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await expect(selectSeatsOnFixedPage(page, concert())).resolves.toBeNull();
+    expect(page.evaluate).not.toHaveBeenCalled();
+  });
+
 });
 
 describe("FixedPageSeatSelector", () => {
@@ -69,18 +138,28 @@ describe("FixedPageSeatSelector", () => {
   });
 
   it("keeps retry policy inside selector instance", async () => {
-    const page = mockPage("https://example.com/fixed.php", { status: "selection_not_applied" });
+    const page = mockPage("https://example.com/fixed.php", { status: "selection_not_applied" }, { availableSeatCount: 1 });
     const selector = new FixedPageSeatSelector({ ...concert(), seat_retry_limit: 3 });
 
-    await expect(selector.select(page)).resolves.toEqual({ status: "no_picks" });
-    expect(page.evaluate).toHaveBeenCalledTimes(3);
+    await expect(selector.select(page)).resolves.toEqual({ status: "selection_not_applied" });
+    expect(page.evaluate).toHaveBeenCalledTimes(6);
   });
 });
 
-function mockPage(url: string, result: FixedPageResult | { status: "selection_not_applied" }) {
+function mockPage(
+  url: string,
+  result: FixedPageResult | { status: "selection_not_applied" },
+  options: { availableSeatCount?: number } = {},
+) {
+  let evaluateCalls = 0;
+  const availableSeatCount = options.availableSeatCount ?? 1;
   return {
     url: () => url,
-    evaluate: vi.fn().mockResolvedValue(result),
+    evaluate: vi.fn().mockImplementation(() => {
+      evaluateCalls += 1;
+      if (evaluateCalls % 2 === 1) return Promise.resolve(availableSeatCount);
+      return Promise.resolve(result);
+    }),
     waitForFunction: vi.fn().mockResolvedValue(undefined),
     waitForTimeout: vi.fn().mockResolvedValue(undefined),
   };
@@ -91,6 +170,8 @@ function concert(): Concert {
     event_url: "https://www.thaiticketmajor.com/performance/example.html",
     event_date: "2026-12-15",
     zone_priority: [],
+    max_zone_cycles: 0,
+    zone_cycle_alert_every: 5,
     ticket_count: 1,
     seat_retry_limit: 2,
     seat_strategy: { prefer_rows: [], avoid_rows: [], prefer_center: true },
