@@ -62,9 +62,20 @@ const ObservabilitySchema = z.object({
   keep_runs: z.number().int().positive().default(10),
 });
 
+const SelectorsSchema = z.object({
+  buy_now_btn: z.string().default("a.btn-buynow"),
+  zone_link: z.string().default("a[href*='zone={zone}']"),
+});
+
+const QueueIndicatorsSchema = z.object({
+  queue_url_pattern: z.string().default("/queue"),
+  verify_url_pattern: z.string().default("/verify.php"),
+  captcha_selector: z.string().default("img.captcha, iframe[src*='recaptcha']"),
+  puzzle_selector: z.string().default(".puzzle-slider, .geetest"),
+});
+
 export const ConcertSchema = z.object({
   event_url: z.string().url(),
-  event_date: z.string(),
   target_round: TargetRoundSchema.optional(),
   queue_start: z.string().datetime({ offset: true }).optional(),
   sale_start: z.string().datetime({ offset: true }).optional(),
@@ -73,17 +84,9 @@ export const ConcertSchema = z.object({
   zone_cycle_alert_every: z.number().int().positive().default(5),
   ticket_count: z.number().int().positive(),
   seat_retry_limit: z.number().int().positive().default(7),
-  seat_strategy: SeatStrategySchema,
-  selectors: z.object({
-    buy_now_btn: z.string().default("a.btn-buynow"),
-    zone_link: z.string().default("a[href*='zone={zone}']"),
-  }),
-  queue_indicators: z.object({
-    queue_url_pattern: z.string().default("/queue"),
-    verify_url_pattern: z.string().default("/verify.php"),
-    captcha_selector: z.string().default("img.captcha, iframe[src*='recaptcha']"),
-    puzzle_selector: z.string().default(".puzzle-slider, .geetest"),
-  }),
+  seat_strategy: SeatStrategySchema.default({}),
+  selectors: SelectorsSchema.default({}),
+  queue_indicators: QueueIndicatorsSchema.default({}),
   observability: ObservabilitySchema.default({
     mode: "minimal",
     artifact_root: "bot_data/runs",

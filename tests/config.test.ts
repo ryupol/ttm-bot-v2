@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -6,6 +6,59 @@ import { selectBotAccounts } from "../src/config/accounts.ts";
 import { loadAppConfig } from "../src/config/load.ts";
 
 describe("loadAppConfig", () => {
+  it("loads a minimal concert config with safe defaults", () => {
+    const root = path.join(tmpdir(), `ttm-config-minimal-${Date.now()}`);
+    mkdirSync(path.join(root, "config"), { recursive: true });
+    mkdirSync(path.join(root, "secrets"), { recursive: true });
+    writeFileSync(path.join(root, "config/settings.yaml"), settingsYaml());
+    writeFileSync(path.join(root, "config/accounts.yaml"), "accounts:\n  - id: 1\n");
+    writeFileSync(
+      path.join(root, "config/concert.yaml"),
+      `
+event_url: https://www.thaiticketmajor.com/performance/example.html
+target_round:
+  date: "2026-12-15"
+  time: "18:00"
+sale_start: "2026-10-01T10:00:00+07:00"
+zone_priority: ["A1", "A2", "B1"]
+ticket_count: 2
+`,
+    );
+
+    const { config } = loadAppConfig({ rootDir: root });
+
+    expect(config.concert).toMatchObject({
+      event_url: "https://www.thaiticketmajor.com/performance/example.html",
+      target_round: { date: "2026-12-15", time: "18:00", type: "offline" },
+      sale_start: "2026-10-01T10:00:00+07:00",
+      zone_priority: ["A1", "A2", "B1"],
+      max_zone_cycles: 0,
+      zone_cycle_alert_every: 5,
+      ticket_count: 2,
+      seat_retry_limit: 7,
+      seat_strategy: { prefer_rows: [], avoid_rows: [], prefer_center: true },
+      selectors: {
+        buy_now_btn: "a.btn-buynow",
+        zone_link: "a[href*='zone={zone}']",
+      },
+      queue_indicators: {
+        queue_url_pattern: "/queue",
+        verify_url_pattern: "/verify.php",
+        captcha_selector: "img.captcha, iframe[src*='recaptcha']",
+        puzzle_selector: ".puzzle-slider, .geetest",
+      },
+      observability: {
+        mode: "minimal",
+        artifact_root: "bot_data/runs",
+        capture_html: true,
+        capture_screenshot: true,
+        capture_network_failures: true,
+        capture_console_errors: true,
+        keep_runs: 10,
+      },
+    });
+  });
+
   it("loads YAML and resolves account env values", () => {
     const root = path.join(tmpdir(), `ttm-config-${Date.now()}`);
     mkdirSync(path.join(root, "config"), { recursive: true });
@@ -104,7 +157,6 @@ accounts:
       path.join(root, "config/concert.yaml"),
       `
 event_url: https://www.thaiticketmajor.com/concert/example.html
-event_date: "2026-08-21"
 target_round:
   date: "2026-08-21"
   time: "18:00"
@@ -179,7 +231,6 @@ observability:
     });
 
     expect(config.concert.event_url).toBe("https://www.thaiticketmajor.com/concert/rookie-divos-concert.html");
-    expect(config.concert.event_date).toBe("2026-09-26");
     expect(config.concert.target_round).toEqual({
       date: "2026-09-26",
       time: "18:00",
@@ -189,6 +240,11 @@ observability:
     expect(config.concert.sale_start).toBe("2026-06-27T10:00:00+07:00");
     expect(config.concert.zone_priority.length).toBeGreaterThan(0);
     expect(config.concert.ticket_count).toBe(2);
+    expect(config.concert.seat_strategy).toEqual({
+      prefer_rows: [],
+      avoid_rows: [],
+      prefer_center: true,
+    });
   });
 
   it("loads the Pond Phuwin concert file by path", () => {
@@ -199,16 +255,31 @@ observability:
     expect(config.concert.event_url).toBe(
       "https://www.thaiticketmajor.com/concert/pond-phuwin-space-soul-dyssey-concert.html",
     );
-    expect(config.concert.event_date).toBe("2026-08-21");
     expect(config.concert.target_round).toEqual({
       date: "2026-08-21",
       time: "18:00",
       type: "offline",
     });
-    expect(config.concert.queue_start).toBe("2026-06-28T09:00:00+07:00");
+    expect(config.concert.queue_start).toBeUndefined();
     expect(config.concert.sale_start).toBe("2026-06-28T10:00:00+07:00");
     expect(config.concert.zone_priority.length).toBeGreaterThan(0);
     expect(config.concert.ticket_count).toBe(2);
+  });
+
+  it("loads every project concert config, including the human template", () => {
+    const concertDirectory = path.join(process.cwd(), "config", "concerts");
+    const concertFiles = readdirSync(concertDirectory)
+      .filter((fileName) => fileName.endsWith(".yaml"))
+      .sort();
+
+    expect(concertFiles).toContain("_template.yaml");
+    for (const concertFile of concertFiles) {
+      expect(() => {
+        loadAppConfig({
+          concertPath: path.join("config", "concerts", concertFile),
+        });
+      }).not.toThrow();
+    }
   });
 });
 
@@ -228,20 +299,10 @@ telegram:
 function concertYaml(zonePriority = ["A1"]): string {
   return `
 event_url: https://www.thaiticketmajor.com/performance/example.html
-event_date: "2026-12-15"
+target_round:
+  date: "2026-12-15"
+  time: "18:00"
 zone_priority: ${JSON.stringify(zonePriority)}
 ticket_count: 2
-seat_strategy:
-  prefer_rows: []
-  avoid_rows: []
-  prefer_center: true
-selectors:
-  buy_now_btn: "a.btn-buynow"
-  zone_link: "a[href*='zone={zone}']"
-queue_indicators:
-  queue_url_pattern: "/queue"
-  verify_url_pattern: "/verify.php"
-  captcha_selector: ".captcha"
-  puzzle_selector: ".puzzle"
 `;
 }
