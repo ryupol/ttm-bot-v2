@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { submitThaiCitizenId, submitVerifyCondition } from "../src/bot/pages/verify.ts";
+import { submitThaiCitizenId, submitVerifyCondition } from "../src/bot/verification/VerifyPage.ts";
 import type { ResolvedAccount } from "../src/config/schema.ts";
 
 describe("submitThaiCitizenId", () => {

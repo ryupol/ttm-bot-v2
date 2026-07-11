@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyPage } from "../src/bot/pages/classifier.ts";
+import { classifyPage } from "../src/bot/routing/PageClassifier.ts";
 
 describe("classifyPage", () => {
   it("classifies Queue-it wait view as queue", () => {

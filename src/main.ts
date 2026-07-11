@@ -58,8 +58,16 @@ for (const account of selectedAccounts) {
   workers.set(account.id, handle);
 }
 
+let shuttingDown = false;
 process.on("SIGINT", () => {
+  if (shuttingDown) process.exit(1);
+  shuttingDown = true;
   void shutdown();
+});
+
+process.on("unhandledRejection", (reason) => {
+  addLog(undefined, `unhandled rejection: ${reason instanceof Error ? reason.message : String(reason)}`);
+  renderApp();
 });
 
 function onBotEvent(event: BotEvent): void {
@@ -78,6 +86,12 @@ function onBotEvent(event: BotEvent): void {
   if (event.type === "alert") addLog(event.botId, event.message);
   if (event.type === "error") {
     addLog(event.botId, `ERROR: ${event.message}`);
+    snapshots.set(event.botId, {
+      id: event.botId,
+      state: "ERROR",
+      detail: event.message,
+      lastEventAt: new Date().toISOString(),
+    });
   }
 
   renderApp();
@@ -104,7 +118,7 @@ function dispatch(command: MainCommand): void {
   const botIds = resolveTargets(command.target, [...workers.keys()]);
   for (const botId of botIds) {
     workers.get(botId)?.send(botCommand);
-    addLog(botId, `command: ${command.type}`);
+    addLog(botId, command.type === "zone" ? `command: zone ${command.zones.join(", ")}` : `command: ${command.type}`);
   }
 }
 
@@ -114,6 +128,7 @@ function toBotCommand(command: Exclude<MainCommand, { type: "log" }>): BotComman
   if (command.type === "go") return { type: "go" };
   if (command.type === "stop") return { type: "stop" };
   if (command.type === "reset") return { type: "reset" };
+  if (command.type === "zone") return { type: "set_zone_priority", zones: command.zones };
   return assertNever(command);
 }
 
@@ -174,8 +189,8 @@ function parseCli(): { bots?: number; concert?: string; settings?: string; accou
 
 function resolveWorkerUrl(): URL {
   return sourceIsTypescript()
-    ? new URL("./bot/worker.ts", import.meta.url)
-    : new URL("./bot/worker.js", import.meta.url);
+    ? new URL("./bot/runtime/worker.ts", import.meta.url)
+    : new URL("./bot/runtime/worker.js", import.meta.url);
 }
 
 function sourceIsTypescript(): boolean {

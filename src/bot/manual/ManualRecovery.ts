@@ -1,5 +1,5 @@
 import type { Page } from "playwright";
-import { detectManualInterventionOnPage } from "./manualIntervention.ts";
+import { detectManualInterventionOnPage } from "./ManualIntervention.ts";
 
 export type ManualRecoveryResult = "cleared" | "stopped";
 

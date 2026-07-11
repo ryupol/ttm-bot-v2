@@ -1,5 +1,5 @@
 import type { Page } from "playwright";
-import { matchSignatures } from "./signatures.ts";
+import { matchSignatures } from "./PageSignatures.ts";
 
 export type PageKind =
   | "login"

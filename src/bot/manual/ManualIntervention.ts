@@ -1,5 +1,5 @@
 import type { Page } from "playwright";
-import { matchSignatures } from "./pages/signatures.ts";
+import { matchSignatures } from "../routing/PageSignatures.ts";
 
 export type ManualInterventionReason =
   | "login"
@@ -10,6 +10,7 @@ export type ManualInterventionReason =
   | "queue_presence_confirm"
   | "forbidden"
   | "too_many_requests";
+
 export type ManualInterventionState = {
   present: false;
 } | {
@@ -18,6 +19,7 @@ export type ManualInterventionState = {
   detail?: string;
   userMessage: string;
 };
+
 export type ManualInterventionTransition = "appeared" | "cleared" | "unchanged";
 
 const YZ_IMAGE_CLASS_PATTERN = /<img\b[^>]*\bclass\s*=\s*["'][^"']*\byz\b[^"']*["'][^>]*>/i;

@@ -1,4 +1,4 @@
-import type { SeatStrategy } from "../config/schema.ts";
+import type { SeatStrategy } from "../../config/schema.ts";
 
 export type AvailableSeat = {
   id: string;

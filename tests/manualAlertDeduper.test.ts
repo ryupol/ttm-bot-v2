@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createManualAlertDeduper } from "../src/bot/manualAlertDeduper.ts";
+import { createManualAlertDeduper } from "../src/bot/manual/ManualAlertDeduper.ts";
 
 describe("manualAlertDeduper", () => {
   it("suppresses same reason and page within cooldown", () => {

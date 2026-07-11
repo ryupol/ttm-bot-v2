@@ -1,5 +1,5 @@
-import type { ManualInterventionReason } from "../manualIntervention.ts";
-import type { PageKind } from "./classifier.ts";
+import type { ManualInterventionReason } from "../manual/ManualIntervention.ts";
+import type { PageKind } from "./PageClassifier.ts";
 
 export type PageSignature = {
   id: string;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextZoneAfter, orderAvailableZones, selectNextAvailableZone } from "../src/bot/zonePriority.ts";
+import { nextZoneAfter, orderAvailableZones, selectNextAvailableZone } from "../src/bot/booking/ZoneSelector.ts";
 
 describe("zonePriority", () => {
   it("returns next zone after current zone", () => {

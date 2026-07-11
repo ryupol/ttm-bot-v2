@@ -1,7 +1,8 @@
 import type { Page } from "playwright";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Notifier } from "../src/bot/notifier.ts";
-import { holdQueue } from "../src/bot/pages/queue.ts";
+import { Notifier } from "../src/bot/observability/Notifier.ts";
+import { holdQueue } from "../src/bot/queue/QueuePage.ts";
+import { QueuePresenceConfirmer } from "../src/bot/queue/QueuePresenceConfirmer.ts";
 import type { BotEvent } from "../src/ipc/types.ts";
 import type { Concert } from "../src/config/schema.ts";
 
@@ -234,6 +235,7 @@ describe("holdQueue", () => {
     expect(button.click).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(21_000);
     await vi.waitFor(() => expect(button.click).toHaveBeenCalledTimes(2));
+    await vi.advanceTimersByTimeAsync(300);
 
     page.setUrl("https://example.com/booking/fixed.php");
     await vi.advanceTimersByTimeAsync(1200);
@@ -303,6 +305,64 @@ describe("holdQueue", () => {
   });
 });
 
+describe("QueuePresenceConfirmer", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("owns visitor presence click cooldown across calls", async () => {
+    let now = 1_000;
+    const button = mockLocator({ text: "Yes, I'm here" });
+    const page = mockPage("https://wait.thaiticketmajor.com/view/?c=ticketmasterasia", {
+      html: queuePresenceHtml(),
+      locators: new Map([["#buttonConfirmVisitorPresence", button]]),
+    });
+    const confirmer = new QueuePresenceConfirmer({
+      botId: 2,
+      now: () => now,
+      sleep: async () => undefined,
+    });
+
+    await expect(confirmer.tryConfirm(page)).resolves.toEqual({ status: "clicked", clickedAt: 1_000 });
+    now += 10_000;
+    await expect(confirmer.tryConfirm(page)).resolves.toEqual({ status: "none" });
+    now += 21_000;
+    await expect(confirmer.tryConfirm(page)).resolves.toEqual({ status: "clicked", clickedAt: 32_000 });
+    expect(button.click).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports failed visitor presence click once until a later click succeeds", async () => {
+    const clickError = new Error("click failed");
+    const failingButton = mockLocator({ text: "Yes, I'm here", clickError });
+    const succeedingButton = mockLocator({ text: "Yes, I'm here" });
+    const locators = new Map([["#buttonConfirmVisitorPresence", failingButton]]);
+    const page = mockPage("https://wait.thaiticketmajor.com/view/?c=ticketmasterasia", {
+      html: queuePresenceHtml(),
+      locators,
+    });
+    const confirmer = new QueuePresenceConfirmer({
+      botId: 3,
+      now: () => 1_000,
+      sleep: async () => undefined,
+    });
+
+    await expect(confirmer.tryConfirm(page)).resolves.toEqual({
+      status: "failed",
+      error: "click failed",
+      shouldEmitManualAlert: true,
+    });
+    await expect(confirmer.tryConfirm(page)).resolves.toEqual({
+      status: "failed",
+      error: "click failed",
+      shouldEmitManualAlert: false,
+    });
+
+    locators.set("#buttonConfirmVisitorPresence", succeedingButton);
+    await expect(confirmer.tryConfirm(page)).resolves.toEqual({ status: "clicked", clickedAt: 1_000 });
+    expect(succeedingButton.click).toHaveBeenCalledTimes(1);
+  });
+});
+
 type MockPage = Page & {
   setUrl: (url: string) => void;
   content: ReturnType<typeof vi.fn<() => Promise<string>>>;
@@ -336,6 +396,15 @@ function mockPage(
     }),
     locator: vi.fn((selector: string) => options.locators?.get(selector) ?? mockLocator({ visible: false })),
   } as unknown as MockPage;
+}
+
+function queuePresenceHtml(): string {
+  return `
+    <script>window.queueViewModel = { customerId: "ticketmasterasia" }</script>
+    <h2>Still here?</h2>
+    <p>Please confirm you're still waiting.</p>
+    <button id="buttonConfirmVisitorPresence">Yes, I'm here</button>
+  `;
 }
 
 function mockLocator(

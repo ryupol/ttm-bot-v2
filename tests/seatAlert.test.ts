@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatSeatsSelectedMessage } from "../src/bot/seatAlert.ts";
+import { formatSeatsSelectedMessage } from "../src/bot/observability/SeatAlert.ts";
 
 describe("seatAlert", () => {
   it("includes selected and target seat counts", () => {

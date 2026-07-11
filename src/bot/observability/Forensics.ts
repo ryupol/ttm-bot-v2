@@ -1,7 +1,7 @@
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Page } from "playwright";
-import type { TargetRound } from "../config/schema.ts";
+import type { TargetRound } from "../../config/schema.ts";
 
 export type RunForensicsOptions = {
   artifactRoot: string;

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { waitForManualInterventionToClear } from "../src/bot/manualRecovery.ts";
+import { waitForManualInterventionToClear } from "../src/bot/manual/ManualRecovery.ts";
 
 describe("manualRecovery", () => {
   it("waits until manual intervention disappears", async () => {

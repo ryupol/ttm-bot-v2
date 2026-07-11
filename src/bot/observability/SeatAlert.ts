@@ -1,4 +1,4 @@
-import type { PickedSeat } from "../ipc/types.ts";
+import type { PickedSeat } from "../../ipc/types.ts";
 
 export function formatSeatsSelectedMessage(botId: number, zone: string | undefined, picks: PickedSeat[], targetCount: number): string {
   if (picks.length === 0) return `Bot ${botId}: Payment page reached - Zone ${zone ?? "unknown"}, seats unknown`;
