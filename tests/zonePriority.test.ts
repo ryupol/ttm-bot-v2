@@ -3,27 +3,27 @@ import { nextZoneAfter, orderAvailableZones, selectNextAvailableZone } from "../
 
 describe("zonePriority", () => {
   it("returns next zone after current zone", () => {
-    expect(nextZoneAfter("B2", ["B2", "B1", "A2"])).toBe("B1");
+    expect(nextZoneAfter("B2", ["B2", "B1", "A2"])).toEqual({ zone: "B1", cycled: false });
   });
 
   it("starts from first zone when current zone is unknown", () => {
-    expect(nextZoneAfter(undefined, ["B2", "B1", "A2"])).toBe("B2");
+    expect(nextZoneAfter(undefined, ["B2", "B1", "A2"])).toEqual({ zone: "B2", cycled: false });
   });
 
   it("skips already tried zones", () => {
-    expect(nextZoneAfter("B2", ["B2", "B1", "A2"], new Set(["B1"]))).toBe("A2");
+    expect(nextZoneAfter("B2", ["B2", "B1", "A2"], new Set(["B1"]))).toEqual({ zone: "A2", cycled: false });
   });
 
   it("wraps to first zone when no later zone remains", () => {
-    expect(nextZoneAfter("A2", ["B2", "B1", "A2"])).toBe("B2");
+    expect(nextZoneAfter("A2", ["B2", "B1", "A2"])).toEqual({ zone: "B2", cycled: false });
   });
 
-  it("keeps cycling after all zones have been tried", () => {
-    expect(nextZoneAfter("A2", ["B2", "B1", "A2"], new Set(["B2", "B1", "A2"]))).toBe("B2");
+  it("keeps cycling after all zones have been tried and flags the new cycle", () => {
+    expect(nextZoneAfter("A2", ["B2", "B1", "A2"], new Set(["B2", "B1", "A2"]))).toEqual({ zone: "B2", cycled: true });
   });
 
   it("does not pick a zone when priority list is empty", () => {
-    expect(nextZoneAfter(undefined, [])).toBeUndefined();
+    expect(nextZoneAfter(undefined, [])).toEqual({ cycled: false });
   });
 
   it("orders available popup zones like v1 priority matching", () => {

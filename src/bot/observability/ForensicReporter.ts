@@ -3,6 +3,7 @@ import type { Page } from "playwright";
 import type { WorkerInit } from "../../ipc/types.ts";
 import { attachForensicListeners, createRunForensics, type RunForensics } from "./Forensics.ts";
 import { classifyPage } from "../routing/PageClassifier.ts";
+import { errorMessage } from "../../utils/errors.ts";
 
 export type ForensicCallbacks = {
   captureDecision: (label: string) => Promise<void>;
@@ -86,8 +87,4 @@ function resolveArtifactRoot(rootDir: string, artifactRoot: string): string {
     throw new Error(`Invalid artifact_root: ${artifactRoot}`);
   }
   return resolvedArtifactRoot;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

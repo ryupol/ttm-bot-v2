@@ -39,7 +39,7 @@ export class PageFlowPolicy {
       return true;
     } catch {
       const deadline = Date.now() + timeout;
-      while (Date.now() <= deadline) {
+      while (Date.now() < deadline) {
         if (page.url().includes("fixed.php")) return true;
         await sleep(pollMs);
       }

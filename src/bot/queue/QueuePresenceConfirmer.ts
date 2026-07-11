@@ -51,28 +51,29 @@ export class QueuePresenceConfirmer {
     if (now - this.lastClickAt < this.cooldownMs) return { status: "none" };
 
     const html = await page.content().catch(() => "");
-    if (!hasPresenceMarkers(html)) return { status: "none" };
+    const target = findConfirmationTarget(html);
+    if (!target) return { status: "none" };
 
-    const button = page.locator("#buttonConfirmVisitorPresence").first();
+    const button = page.locator(target.selector).first();
     const visible = await button.isVisible({ timeout: 300 }).catch(() => false);
     if (!visible) return { status: "none" };
     const enabled = await button.isEnabled({ timeout: 300 }).catch(() => false);
     if (!enabled) return { status: "none" };
     const buttonText = await button.textContent({ timeout: 300 }).catch(() => "");
-    if (buttonText && !/yes,\s*i['’]m here|i['’]m here|here/i.test(buttonText)) return { status: "none" };
+    if (buttonText && !target.textPattern.test(buttonText)) return { status: "none" };
 
     try {
-      await this.forensics?.captureDecision?.("queue-presence-confirm-before-click");
-      this.forensics?.event?.("queue-presence-confirm", "detected", {
+      await this.forensics?.captureDecision?.(`${target.action}-before-click`);
+      this.forensics?.event?.(target.action, "detected", {
         botId: this.botId,
-        selector: "#buttonConfirmVisitorPresence",
+        selector: target.selector,
       });
       await button.click({ timeout: 3000 });
       await this.sleep(this.settleMs);
-      await this.forensics?.captureDecision?.("queue-presence-confirm-after-click");
-      this.forensics?.event?.("queue-presence-confirm", "clicked", {
+      await this.forensics?.captureDecision?.(`${target.action}-after-click`);
+      this.forensics?.event?.(target.action, "clicked", {
         botId: this.botId,
-        selector: "#buttonConfirmVisitorPresence",
+        selector: target.selector,
       });
       this.lastClickAt = now;
       this.clickCount += 1;
@@ -98,11 +99,39 @@ function isWaitHost(url: string): boolean {
   }
 }
 
-function hasPresenceMarkers(html: string): boolean {
-  return html.includes("buttonConfirmVisitorPresence") &&
+type ConfirmationTarget = {
+  action: "queue-presence-confirm" | "queue-join-waiting-room";
+  selector: string;
+  textPattern: RegExp;
+};
+
+function findConfirmationTarget(html: string): ConfirmationTarget | undefined {
+  if (
+    html.includes("buttonConfirmVisitorPresence") &&
     html.includes("Still here?") &&
     html.includes("Please confirm you're still waiting") &&
-    html.includes("Yes, I'm here");
+    html.includes("Yes, I'm here")
+  ) {
+    return {
+      action: "queue-presence-confirm",
+      selector: "#buttonConfirmVisitorPresence",
+      textPattern: /yes,\s*i['’]m here|i['’]m here|here/i,
+    };
+  }
+
+  if (
+    html.includes("waitingroomentry-content-holder") &&
+    html.includes("botdetect-button") &&
+    /join waiting room/i.test(html)
+  ) {
+    return {
+      action: "queue-join-waiting-room",
+      selector: ".botdetect-button.btn",
+      textPattern: /join waiting room/i,
+    };
+  }
+
+  return undefined;
 }
 
 function sleep(ms: number): Promise<void> {
